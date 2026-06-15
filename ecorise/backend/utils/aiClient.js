@@ -296,4 +296,51 @@ Respond ONLY in JSON:
   }
 }
 
-module.exports = { analyzeEcoAction, generateDailyQuests, checkQuestMatch, rateTrashSeverity };
+// ── 5. AI eco-coach ──
+
+const COACH_MODEL = 'claude-sonnet-4-6';
+const NEXT_LEVER = {
+  transportation: 'a plant-based meal or a no-waste lunch',
+  waste: 'biking or walking a short trip',
+  energy: 'refusing single-use plastic this week',
+  food: 'line-drying laundry or switching to LED bulbs',
+  nature: 'a zero-waste lunch or a transit commute',
+};
+
+async function ecoCoach({ stats, message, history }) {
+  const client = getClient();
+  const top = stats.topCategory;
+  const pct = (stats.totalCO2 > 0 && top && stats.byCategory[top])
+    ? Math.round((stats.byCategory[top].co2 / stats.totalCO2) * 100) : 0;
+
+  if (!client) {
+    // Offline: rule-based but grounded in the user's real data (demo-friendly).
+    if (!message) {
+      if (stats.postCount === 0) {
+        return { reply: "Welcome! Log your first eco action with a photo and I'll start tracking your impact and showing your biggest levers to cut emissions.", isMock: true };
+      }
+      const lever = top
+        ? `Your biggest category is ${top} (${pct}% of your CO₂ saved). For your next jump, try ${NEXT_LEVER[top] || 'a new category'}.`
+        : 'Log a few more actions and I’ll pinpoint your biggest lever.';
+      return { reply: `You've logged ${stats.postCount} action${stats.postCount === 1 ? '' : 's'} and saved ~${stats.totalCO2} kg CO₂. ${lever}`, isMock: true };
+    }
+    return { reply: `Good question. Based on your history (${stats.postCount} actions, ~${stats.totalCO2} kg CO₂ saved${top ? `, mostly ${top}` : ''}), a high-impact next step is ${top ? (NEXT_LEVER[top] || 'trying a new category') : 'logging a transport or food action'}. (Set ANTHROPIC_API_KEY for full conversational coaching.)`, isMock: true };
+  }
+
+  try {
+    const sys = "You are EcoRise's AI eco-coach. Be concise, warm, and specific. Use the user's real data to give personalized, high-impact advice on cutting their carbon footprint, and always suggest one concrete next action. Keep replies under ~90 words. Never invent numbers beyond the data given.";
+    const ctxLine = `User stats: ${stats.postCount} actions logged, ~${stats.totalCO2} kg CO₂ saved, ${stats.totalPoints} points, ${stats.streak}-day streak. By category (kg CO₂): ${Object.entries(stats.byCategory).map(([k, v]) => `${k} ${v.co2}`).join(', ') || 'none yet'}. Biggest: ${top || 'n/a'}.`;
+    const msgs = [];
+    for (const h of (history || []).slice(-6)) {
+      if (h && h.role && h.content) msgs.push({ role: h.role === 'assistant' ? 'assistant' : 'user', content: String(h.content).slice(0, 1000) });
+    }
+    msgs.push({ role: 'user', content: message ? `${ctxLine}\n\nUser: ${message}` : `${ctxLine}\n\nGive me one short personalized insight about my biggest lever to cut emissions, plus one concrete next action.` });
+    const r = await client.messages.create({ model: COACH_MODEL, max_tokens: 300, system: sys, messages: msgs });
+    return { reply: r.content[0].text.trim(), isMock: false };
+  } catch (err) {
+    console.error('ecoCoach error:', err.message);
+    return { reply: "I couldn't reach the coaching model right now — try again in a moment.", isMock: true, error: err.message };
+  }
+}
+
+module.exports = { analyzeEcoAction, generateDailyQuests, checkQuestMatch, rateTrashSeverity, ecoCoach };

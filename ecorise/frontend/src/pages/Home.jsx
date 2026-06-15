@@ -155,6 +155,17 @@ export default function Home({ ctx }) {
         </div>
       </div>
 
+      {/* AI eco-coach */}
+      <div style={{ padding: '16px 16px 0' }}>
+        <button onClick={ctx.openCoach} aria-label="Open AI eco-coach" style={{ width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px solid rgba(124,77,255,.3)', borderRadius: 18, padding: 16, background: 'radial-gradient(180px 80px at 88% -10%, rgba(124,77,255,.22), transparent), var(--navy-800)', display: 'flex', gap: 13, alignItems: 'center' }}>
+          <span style={{ width: 44, height: 44, borderRadius: 13, flexShrink: 0, background: 'rgba(124,77,255,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="sparkle" size={24} color="var(--purple-2)" /></span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 16, color: '#fff' }}>AI Eco-Coach</div>
+            <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>Ask anything · get your biggest lever to cut emissions</div>
+          </div>
+        </button>
+      </div>
+
       {/* climate fact */}
       <div style={{ padding: '16px 16px 0' }}><ClimateFact /></div>
 

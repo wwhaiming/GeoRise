@@ -9,7 +9,7 @@ import { fireConfetti } from './components/Confetti';
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
 import { Feed, Leaderboard, Profile, Organizer } from './pages/Pages';
-import { LogAction, TrashSpotter } from './pages/Modals';
+import { LogAction, TrashSpotter, Coach } from './pages/Modals';
 
 import api from './utils/api';
 
@@ -257,7 +257,7 @@ export default function App() {
     user: user || { name: 'Eco Champion', handle: '@you', avatar: '' },
     members, posts, quests, leaderboard, leaderboardId,
     resetTarget, bump, podiumVariant,
-    go, showToast, openLog: () => setModal('log'), openTrash: () => setModal('trash'),
+    go, showToast, openLog: () => setModal('log'), openTrash: () => setModal('trash'), openCoach: () => setModal('coach'),
     closeModal: () => setModal(null), toggleLike, reportPost, keepPost, deletePost, onActionComplete,
     updateLeaderboard, logout,
     notifications, unreadCount, markNotificationsRead,
@@ -287,6 +287,7 @@ export default function App() {
       {showNav && <BottomNav screen={screen} go={go} onFab={() => setModal('log')} />}
       {modal === 'log' && <LogAction ctx={ctx} />}
       {modal === 'trash' && <TrashSpotter ctx={ctx} />}
+      {modal === 'coach' && <Coach ctx={ctx} />}
       <Toast toast={toast} />
     </div>
   );

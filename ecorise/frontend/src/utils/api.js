@@ -56,6 +56,9 @@ export const api = {
   // Trash
   reportTrash: (body) => apiFetch('/api/trash', { method: 'POST', body: JSON.stringify(body) }),
 
+  // AI eco-coach
+  coach: (message, history) => apiFetch('/api/coach', { method: 'POST', body: JSON.stringify({ message, history }) }),
+
   // Users
   getUser: (id) => apiFetch(`/api/users/${id}`),
   updateUser: (id, body) => apiFetch(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),

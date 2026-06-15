@@ -41,6 +41,10 @@ const schemas = {
     leaderboardId: z.string().uuid().optional(),
   }),
   questProgress: z.object({ leaderboardId: z.string().uuid().optional() }),
+  coach: z.object({
+    message: z.string().trim().max(1000).optional(),
+    history: z.array(z.object({ role: z.enum(['user','assistant']), content: z.string().max(2000) })).max(20).optional(),
+  }),
   updateUser: z.object({
     name: z.string().trim().min(1).max(60).optional(),
     handle: z.string().trim().regex(/^@?[a-zA-Z0-9_]{1,20}$/).optional(),

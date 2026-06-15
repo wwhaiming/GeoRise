@@ -33,6 +33,7 @@ app.use('/api/posts', require('./routes/posts'));
 app.use('/api/quests', require('./routes/quests'));
 app.use('/api/trash', require('./routes/trashspotter'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/coach', require('./routes/coach'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

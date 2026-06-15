@@ -1,5 +1,5 @@
 /* EcoRise — Log Action + Trash Spotter modal sheets */
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Icon from '../components/Icon';
 import { PointsChip } from '../components/UI';
 import { Sheet, UploadFrame } from '../components/Shared';
@@ -222,6 +222,57 @@ export function TrashSpotter({ ctx }) {
             </button>
           </>
         )}
+      </div>
+    </Sheet>
+  );
+}
+
+/* ---------- AI ECO-COACH ---------- */
+export function Coach({ ctx }) {
+  const [msgs, setMsgs] = useState([]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    let live = true;
+    api.coach(undefined, [])
+      .then(d => { if (live) setMsgs([{ role: 'assistant', content: d.reply }]); })
+      .catch(() => { if (live) setMsgs([{ role: 'assistant', content: 'Hi! Ask me anything about cutting your carbon footprint.' }]); })
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs, loading]);
+
+  const send = async () => {
+    const t = input.trim();
+    if (!t || loading) return;
+    const next = [...msgs, { role: 'user', content: t }];
+    setMsgs(next); setInput(''); setLoading(true);
+    try {
+      const d = await api.coach(t, next);
+      setMsgs(m => [...m, { role: 'assistant', content: d.reply }]);
+    } catch {
+      setMsgs(m => [...m, { role: 'assistant', content: "Sorry, I couldn't answer just now." }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <Sheet title="AI Eco-Coach" onClose={ctx.closeModal} accent="var(--green)">
+      <div style={{ padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', height: '58vh' }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: 10, paddingRight: 4, alignContent: 'start' }}>
+          {msgs.map((m, i) => (
+            <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '86%', background: m.role === 'user' ? 'var(--green)' : 'var(--navy-700)', color: m.role === 'user' ? '#06281A' : '#fff', padding: '10px 14px', borderRadius: 16, fontSize: 14, fontWeight: 600, lineHeight: 1.45 }}>{m.content}</div>
+          ))}
+          {loading && <div style={{ alignSelf: 'flex-start', color: 'var(--text-dim)', fontSize: 13, fontWeight: 700 }}>coaching…</div>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <input className="field" style={{ flex: 1 }} placeholder="Ask: is biking or transit better?" value={input}
+            onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && send()} aria-label="Message the eco-coach" />
+          <button className="btn btn-primary" style={{ padding: '0 16px' }} onClick={send} disabled={loading}>Send</button>
+        </div>
       </div>
     </Sheet>
   );
