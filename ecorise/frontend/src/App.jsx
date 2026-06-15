@@ -13,6 +13,10 @@ import { LogAction, TrashSpotter } from './pages/Modals';
 
 import api from './utils/api';
 
+// Invite deep-link: /j/<code> -> join that board after auth.
+const inviteMatch = typeof window !== 'undefined' && window.location.pathname.match(/^\/j\/([A-Za-z0-9]+)/);
+const PENDING_INVITE = inviteMatch ? inviteMatch[1] : null;
+
 // Mock data for when backend is unavailable
 const MOCK_MEMBERS = [
   { user_id: 'maya', name: 'Maya Chen', handle: '@mayagrows', points: 4820, avatar: 'https://i.pravatar.cc/200?img=47', streak: 12 },
@@ -45,9 +49,8 @@ const MOCK_QUESTS = [
 ];
 
 export default function App() {
-  // Auth state
+  // Auth state (session is an httpOnly cookie; no token kept in JS)
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('ecorise_token'));
   const [authed, setAuthed] = useState(false);
 
   // App state
@@ -63,32 +66,32 @@ export default function App() {
   const [leaderboard, setLeaderboard] = useState({ name: 'Greenfield High', prize: '$250 campus store + a tree planted', invite_code: 'GRNFLD-7K2', reset_interval: 'weekly' });
   const [leaderboardId, setLeaderboardId] = useState(null);
   const [podiumVariant, setPodiumVariant] = useState('stand');
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const appRef = useRef(null);
   const toastTimer = useRef(null);
   const resetTarget = useRef(Date.now() + (3 * 86400000) + (14 * 3600000) + (22 * 60000)).current;
 
-  // ── Init: check auth on mount ──
+  // ── Init: check session (cookie) on mount ──
   useEffect(() => {
-    if (token) {
-      api.me().then(data => {
-        setUser(data.user);
-        setAuthed(true);
-        setScreen('home');
-        loadData();
-      }).catch(() => {
-        localStorage.removeItem('ecorise_token');
-        setToken(null);
-      });
-    }
+    api.me().then(data => {
+      setUser(data.user);
+      setAuthed(true);
+      setScreen('home');
+      loadData();
+      consumePendingInvite();
+    }).catch(() => { /* not signed in — show onboarding */ });
   }, []);
 
   const loadData = useCallback(async () => {
     try {
       // Try to load leaderboards
       const boards = await api.listLeaderboards();
+      let activeBoardId = leaderboardId;
       if (boards.leaderboards?.length > 0) {
         const board = boards.leaderboards[0];
+        activeBoardId = board.id;
         setLeaderboardId(board.id);
         setLeaderboard(board);
 
@@ -98,8 +101,8 @@ export default function App() {
         }
       }
 
-      // Load posts
-      const postsData = await api.getPosts(leaderboardId);
+      // Load posts for the active board (use the resolved id, not stale state)
+      const postsData = await api.getPosts(activeBoardId);
       if (postsData.posts?.length > 0) {
         setPosts(postsData.posts);
       }
@@ -109,10 +112,33 @@ export default function App() {
       if (questsData.quests?.length > 0) {
         setQuests(questsData.quests);
       }
+
+      // Notifications
+      const me = await api.me().catch(() => null);
+      if (me?.user?.id) {
+        const n = await api.getNotifications(me.user.id).catch(() => null);
+        if (n) { setNotifications(n.notifications || []); setUnreadCount(n.unread || 0); }
+      }
     } catch {
-      // Use mock data if backend unavailable
+      // Offline: keep seed data (clearly a demo, not real standings).
     }
   }, [leaderboardId]);
+
+  const consumePendingInvite = useCallback(() => {
+    if (!PENDING_INVITE) return;
+    api.joinLeaderboard(null, PENDING_INVITE).then(r => {
+      window.history.replaceState({}, '', '/');
+      showToast(`Joined ${r.name || 'the leaderboard'}!`);
+      loadData();
+    }).catch(() => { window.history.replaceState({}, '', '/'); });
+  }, [loadData]);
+
+  const markNotificationsRead = useCallback(async () => {
+    if (!user?.id) return;
+    setUnreadCount(0);
+    setNotifications(prev => prev.map(n => ({ ...n, read: 1 })));
+    try { await api.readNotifications(user.id); } catch { }
+  }, [user]);
 
   // ── Toast ──
   const showToast = (msg) => {
@@ -138,9 +164,8 @@ export default function App() {
   };
 
   // ── Auth callback ──
-  const onAuth = (userData, tokenStr) => {
+  const onAuth = (userData) => {
     setUser(userData);
-    setToken(tokenStr);
     setAuthed(true);
     setScreen('home');
 
@@ -167,14 +192,24 @@ export default function App() {
     }).catch(() => {});
 
     loadData();
+    consumePendingInvite();
   };
 
   // ── Action complete ──
   const onActionComplete = (data) => {
     setModal(null);
-    const pts = data.points || 60;
-    addPoints(pts);
-    showToast(`+${pts} pts · ${data.aiResult?.specificAction || 'Eco action'}`);
+    // Honor server rejection — never fabricate points.
+    if (!data || data.accepted === false || data.success === false) {
+      showToast(data?.description || 'Not accepted — try another photo');
+      return;
+    }
+    const pts = Number(data.points) || 0;
+    if (pts > 0) {
+      addPoints(pts);
+      showToast(`+${pts} pts · ${data.aiResult?.specificAction || data.description || 'Eco action'}`);
+    } else {
+      showToast('Logged');
+    }
     loadData();
   };
 
@@ -184,24 +219,26 @@ export default function App() {
     try { await api.likePost(postId); } catch { }
   };
 
-  // ── Report post ──
+  // ── Moderation (await the server; never show success on a 403) ──
   const reportPost = async (postId) => {
-    showToast('Post reported to moderators');
-    try { await api.reportPost(postId); loadData(); } catch { }
+    try { await api.reportPost(postId); showToast('Post reported to moderators'); loadData(); }
+    catch (err) { showToast(err.message || 'Could not report post'); }
   };
 
-  // ── Keep/resolve post ──
   const keepPost = async (postId) => {
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, reported: 0 } : p));
-    showToast('Post kept');
-    try { await api.resolvePost(postId); loadData(); } catch { }
+    try {
+      await api.resolvePost(postId);
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, reported: 0 } : p));
+      showToast('Post kept'); loadData();
+    } catch (err) { showToast(err.message || 'Not allowed'); }
   };
 
-  // ── Delete/remove post ──
   const deletePost = async (postId) => {
-    setPosts(prev => prev.filter(p => p.id !== postId));
-    showToast('Post removed');
-    try { await api.deletePost(postId); loadData(); } catch { }
+    try {
+      await api.deletePost(postId);
+      setPosts(prev => prev.filter(p => p.id !== postId));
+      showToast('Post removed'); loadData();
+    } catch (err) { showToast(err.message || 'Not allowed'); }
   };
 
   // ── Update leaderboard ──
@@ -215,10 +252,8 @@ export default function App() {
   // ── Logout ──
   const logout = async () => {
     try { await api.logout(); } catch { }
-    localStorage.removeItem('ecorise_token');
     localStorage.removeItem('ecorise_onboarded');
     setUser(null);
-    setToken(null);
     setAuthed(false);
     setScreen('onboarding');
   };
@@ -231,6 +266,7 @@ export default function App() {
     go, showToast, openLog: () => setModal('log'), openTrash: () => setModal('trash'),
     closeModal: () => setModal(null), toggleLike, reportPost, keepPost, deletePost, onActionComplete,
     updateLeaderboard, logout,
+    notifications, unreadCount, markNotificationsRead,
   };
 
   const isOnboarding = screen === 'onboarding' || !authed;

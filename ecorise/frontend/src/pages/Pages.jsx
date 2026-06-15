@@ -1,10 +1,11 @@
 /* EcoRise — Feed, Quests, Profile, Leaderboard, Organizer pages */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../components/Icon';
 import Avatar from '../components/Avatar';
 import Podium from '../components/Podium';
 import { PointsChip, RankBadge, Streak, Switch, METAL } from '../components/UI';
 import { ResetTimer } from '../components/Shared';
+import api from '../utils/api';
 
 // ── mention renderer ──
 function mention(text) {
@@ -13,11 +14,69 @@ function mention(text) {
     t.startsWith('@') ? <span key={i} style={{ color: 'var(--green)', fontWeight: 700 }}>{t}</span> : t);
 }
 
+function copyInvite(code, ctx) {
+  const url = `${location.origin}/j/${code || ''}`;
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(url).then(() => ctx.showToast('Invite link copied!')).catch(() => ctx.showToast(url));
+  } else {
+    ctx.showToast(url);
+  }
+}
+
+// ── inline comments ──
+function CommentSection({ postId, ctx }) {
+  const [comments, setComments] = useState([]);
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let live = true;
+    api.getComments(postId)
+      .then(d => { if (live) setComments(d.comments || []); })
+      .catch(() => {})
+      .finally(() => { if (live) setLoading(false); });
+    return () => { live = false; };
+  }, [postId]);
+
+  const submit = async () => {
+    const t = text.trim();
+    if (!t) return;
+    setText('');
+    try {
+      const c = await api.commentPost(postId, t);
+      setComments(prev => [...prev, { id: c.id, text: t, user_name: c.user_name || 'You', created_at: c.created_at }]);
+    } catch (err) {
+      ctx.showToast(err.message || 'Could not post comment');
+    }
+  };
+
+  return (
+    <div style={{ padding: '0 14px 14px', display: 'grid', gap: 10 }}>
+      {loading ? (
+        <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>Loading comments…</div>
+      ) : comments.length === 0 ? (
+        <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>No comments yet. Be the first.</div>
+      ) : comments.map(c => (
+        <div key={c.id} style={{ fontSize: 13.5 }}>
+          <span style={{ fontWeight: 800, color: 'var(--text)' }}>{c.user_name || c.user_handle || 'User'}</span>{' '}
+          <span className="muted" style={{ fontWeight: 600 }}>{mention(c.text)}</span>
+        </div>
+      ))}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input className="field" style={{ flex: 1 }} placeholder="Add a comment…" value={text}
+          onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} aria-label="Add a comment" />
+        <button className="btn btn-primary" style={{ padding: '0 16px' }} onClick={submit}>Post</button>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================
    FEED
    ============================================================ */
 function FeedCard({ post, ctx }) {
   const [menu, setMenu] = useState(false);
+  const [showC, setShowC] = useState(false);
   const ago = (() => {
     if (!post.created_at) return '';
     const mins = Math.round((Date.now() - new Date(post.created_at).getTime()) / 60000);
@@ -32,7 +91,7 @@ function FeedCard({ post, ctx }) {
           <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15 }}>{post.user_name || 'User'}</div>
           <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>{post.user_handle} · {ago}</div>
         </div>
-        <button className="btn btn-ghost" style={{ padding: 6 }} onClick={() => setMenu(!menu)}><Icon name="dots" size={22} /></button>
+        <button className="btn btn-ghost" style={{ padding: 6 }} aria-label="Post options" onClick={() => setMenu(!menu)}><Icon name="dots" size={22} /></button>
         {menu && (
           <div style={{ position: 'absolute', top: 48, right: 14, zIndex: 10, background: 'var(--navy-600)', borderRadius: 14, padding: 6, boxShadow: '0 12px 30px rgba(0,0,0,.5)', border: '1px solid rgba(255,255,255,.08)' }}>
             <button className="btn btn-ghost" style={{ color: 'var(--coral)', fontSize: 14, padding: '8px 14px', fontFamily: 'var(--body)', fontWeight: 800 }} onClick={() => { setMenu(false); ctx.reportPost(post.id); }}>
@@ -43,7 +102,7 @@ function FeedCard({ post, ctx }) {
       </div>
       {/* photo / gradient placeholder */}
       <div style={{ position: 'relative', height: 230, background: post.image?.startsWith('data:') ? `url(${post.image}) center/cover` : 'linear-gradient(135deg,#0e7a4f,#11b06f)', display: 'flex', alignItems: 'flex-end', padding: 14 }}>
-        {post.image?.startsWith('data:') && <img src={post.image} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+        {post.image?.startsWith('data:') && <img src={post.image} alt={post.action_desc || 'Eco action'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,.45))' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <span className="chip" style={{ background: 'rgba(0,0,0,.45)', color: '#fff', backdropFilter: 'blur(6px)', fontSize: 12 }}>
@@ -59,17 +118,18 @@ function FeedCard({ post, ctx }) {
           <span className="chip chip-dim" style={{ fontSize: 11.5 }}><Icon name="leaf" size={12} color="var(--green)" /> {post.co2_saved || 0} kg CO₂ saved</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.06)' }}>
-          <button className="btn btn-ghost" style={{ padding: 0, gap: 7, color: post.liked ? 'var(--coral)' : 'var(--text-muted)', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14 }} onClick={() => ctx.toggleLike(post.id)}>
+          <button className="btn btn-ghost" style={{ padding: 0, gap: 7, color: post.liked ? 'var(--coral)' : 'var(--text-muted)', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14 }} aria-label={post.liked ? 'Unlike' : 'Like'} onClick={() => ctx.toggleLike(post.id)}>
             <Icon name="heart" size={22} color={post.liked ? 'var(--coral)' : 'var(--text-muted)'} fill={post.liked} /> {post.like_count || 0}
           </button>
-          <button className="btn btn-ghost" style={{ padding: 0, gap: 7, color: 'var(--text-muted)', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14 }} onClick={() => ctx.showToast('Comments coming soon')}>
+          <button className="btn btn-ghost" style={{ padding: 0, gap: 7, color: 'var(--text-muted)', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14 }} aria-expanded={showC} aria-label="Toggle comments" onClick={() => setShowC(s => !s)}>
             <Icon name="chat" size={21} /> {post.comment_count || 0}
           </button>
-          <button className="btn btn-ghost" style={{ padding: 0, marginLeft: 'auto', color: 'var(--text-muted)' }} onClick={() => ctx.showToast('Shared!')}>
+          <button className="btn btn-ghost" style={{ padding: 0, marginLeft: 'auto', color: 'var(--text-muted)' }} aria-label="Share" onClick={() => ctx.showToast('Shared!')}>
             <Icon name="share" size={19} />
           </button>
         </div>
       </div>
+      {showC && <CommentSection postId={post.id} ctx={ctx} />}
     </div>
   );
 }
@@ -112,7 +172,7 @@ export function Leaderboard({ ctx }) {
           <div className="eyebrow" style={{ color: 'var(--green)' }}>{leaderboard?.name || 'EcoRise'}</div>
           <div className="h1" style={{ fontSize: 27 }}>Leaderboard</div>
         </div>
-        <button className="btn btn-secondary btn-sm" onClick={() => ctx.go('organizer')} style={{ padding: 10 }}>
+        <button className="btn btn-secondary btn-sm" aria-label="Board settings" onClick={() => ctx.go('organizer')} style={{ padding: 10 }}>
           <Icon name="settings" size={20} />
         </button>
       </div>
@@ -161,7 +221,7 @@ export function Leaderboard({ ctx }) {
           ))}
         </div>
 
-        <button className="btn btn-purple btn-block" onClick={() => ctx.showToast('Invite link copied!')}>
+        <button className="btn btn-purple btn-block" onClick={() => copyInvite(leaderboard?.invite_code, ctx)}>
           <Icon name="share" size={19} color="#fff" /> Invite friends
         </button>
       </div>
@@ -188,17 +248,13 @@ export function Profile({ ctx }) {
     top_three: { icon: 'trophy', c: '#FFD23F', t: 'Podium' },
     ten_actions: { icon: 'bolt', c: '#7C4DFF', t: 'Veteran' },
   };
-  const badges = (user.badges || []).map(b => BADGE_MAP[b.badge_type || b] || { icon: 'star', c: '#38BDF8', t: 'Badge' });
-  const defaultBadges = [
-    { icon: 'bike', c: '#00E676', t: 'Commuter' }, { icon: 'drop', c: '#38BDF8', t: 'Hydrated' },
-    { icon: 'trash', c: '#FF6B6B', t: 'Spotter' }, { icon: 'flame', c: '#FF8A4B', t: 'On Fire' },
-  ];
-  const displayBadges = badges.length > 0 ? badges : defaultBadges;
+  // Show only badges the user has actually earned (no decorative defaults).
+  const displayBadges = (user.badges || []).map(b => BADGE_MAP[b.badge_type || b] || { icon: 'star', c: '#38BDF8', t: 'Badge' });
 
   return (
     <div className="screen-in">
       <div style={{ padding: '20px 18px 6px', textAlign: 'center', position: 'relative' }}>
-        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} onClick={() => ctx.showToast('Settings')}>
+        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} aria-label="Settings" onClick={() => ctx.showToast('Settings')}>
           <Icon name="settings" size={20} />
         </button>
         <Avatar src={user.avatar} name={user.name} size={92} ring="var(--green)" glow style={{ margin: '0 auto 12px' }} />
@@ -217,14 +273,20 @@ export function Profile({ ctx }) {
       </div>
       <div style={{ padding: '18px 16px 0' }}>
         <div className="h2" style={{ marginBottom: 10 }}>Badges earned</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
-          {displayBadges.map((b, i) => (
-            <div key={i} className="card" style={{ padding: '14px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-              <span style={{ width: 44, height: 44, borderRadius: '50%', background: `${b.c}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 16px ${b.c}33` }}><Icon name={b.icon} size={22} color={b.c} /></span>
-              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)' }}>{b.t}</span>
-            </div>
-          ))}
-        </div>
+        {displayBadges.length === 0 ? (
+          <div className="card" style={{ padding: 20, textAlign: 'center' }}>
+            <div className="dim" style={{ fontWeight: 700, fontSize: 13.5 }}>No badges yet — log eco actions to earn your first one.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10 }}>
+            {displayBadges.map((b, i) => (
+              <div key={i} className="card" style={{ padding: '14px 6px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+                <span style={{ width: 44, height: 44, borderRadius: '50%', background: `${b.c}22`, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 0 16px ${b.c}33` }}><Icon name={b.icon} size={22} color={b.c} /></span>
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)' }}>{b.t}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ padding: '18px 16px 100px', display: 'grid', gap: 12 }}>
         <button className="btn btn-purple btn-block" onClick={() => ctx.go('organizer')}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Create a leaderboard</button>
@@ -250,7 +312,7 @@ export function Organizer({ ctx }) {
   return (
     <div className="screen-in" style={{ paddingBottom: 110 }}>
       <div style={{ padding: '16px 18px 6px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} onClick={() => ctx.go('leaderboard')}><Icon name="chevL" size={20} /></button>
+        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back" onClick={() => ctx.go('leaderboard')}><Icon name="chevL" size={20} /></button>
         <div>
           <div className="eyebrow" style={{ color: 'var(--purple-2)' }}>Organizer</div>
           <div className="h1" style={{ fontSize: 24 }}>Manage board</div>
@@ -277,8 +339,8 @@ export function Organizer({ ctx }) {
           </div>
           <div>
             <label className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>Reset interval</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 6 }}>
-              {['daily', 'weekly', 'monthly', 'custom'].map(o => (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6 }}>
+              {['daily', 'weekly', 'monthly'].map(o => (
                 <button key={o} onClick={() => setInterval_(o)} className="btn btn-sm" style={{
                   fontFamily: 'var(--display)', fontWeight: 600, fontSize: 13, padding: '11px 4px', textTransform: 'capitalize',
                   background: interval === o ? 'linear-gradient(180deg,var(--green-2),var(--green))' : 'var(--navy-800)',
@@ -315,7 +377,7 @@ export function Organizer({ ctx }) {
             <label className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>Invite link</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <div className="field" style={{ flex: 1, display: 'flex', alignItems: 'center', color: 'var(--green)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>ecorise.app/j/{ctx.leaderboard?.invite_code || 'INVITE'}</div>
-              <button className="btn btn-primary" style={{ padding: '0 18px' }} onClick={() => ctx.showToast('Invite link copied!')}><Icon name="share" size={18} color="#06281A" /></button>
+              <button className="btn btn-primary" style={{ padding: '0 18px' }} aria-label="Copy invite link" onClick={() => copyInvite(ctx.leaderboard?.invite_code, ctx)}><Icon name="share" size={18} color="#06281A" /></button>
             </div>
           </div>
           <button className="btn btn-purple btn-block btn-lg" onClick={async () => {
@@ -338,7 +400,7 @@ export function Organizer({ ctx }) {
           {reports.map(r => (
             <div key={r.id} className="card" style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 14, background: 'linear-gradient(135deg,#5b21b6,#7C4DFF)', flexShrink: 0 }} />
+                <div style={{ width: 64, height: 64, borderRadius: 14, background: r.image?.startsWith('data:') ? `url(${r.image}) center/cover` : 'linear-gradient(135deg,#5b21b6,#7C4DFF)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14 }}>{r.user_name}</div>
                   <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, marginTop: 4 }}>{r.action_desc}</div>

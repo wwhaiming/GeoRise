@@ -9,6 +9,9 @@ try {
   Anthropic = null;
 }
 
+// Locally-trained offline trash detector (datasets/train_trash_detector.py -> ONNX).
+const localTrashModel = require('./localTrashModel');
+
 function getClient() {
   if (!process.env.ANTHROPIC_API_KEY || !Anthropic) return null;
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -33,48 +36,50 @@ const MOCK_QUESTS = [
 
 // ── 1. Analyze eco action image ──
 
+const ECO_MODEL = 'claude-sonnet-4-6';
+const ECO_PROMPT_VERSION = '2026-06-15.gate-v1';
+const ECO_CONFIDENCE_FLOOR = Number(process.env.ECO_CONFIDENCE_FLOOR || 0.5);
+
 async function analyzeEcoAction(imageBase64) {
   const client = getClient();
 
   if (!client) {
-    // Return a random mock action
-    const mock = MOCK_ECO_ACTIONS[Math.floor(Math.random() * MOCK_ECO_ACTIONS.length)];
-    return { ...mock, isMock: true };
+    // No vision model offline -> do NOT mint points from a fabricated action.
+    // Set MOCK_ECO_ALWAYS_PASS=true to restore demo behavior (clearly flagged fake).
+    if (process.env.MOCK_ECO_ALWAYS_PASS === 'true') {
+      const mock = MOCK_ECO_ACTIONS[Math.floor(Math.random() * MOCK_ECO_ACTIONS.length)];
+      return { ...mock, isEcoAction: true, confidence: 0, isMock: true,
+        provenance: { source: 'mock', model: 'mock', promptVersion: ECO_PROMPT_VERSION } };
+    }
+    return {
+      isEcoAction: false, confidence: 0, actionType: 'other', specificAction: 'AI disabled',
+      requiresFollowUp: false, estimatedCO2Saved: 0,
+      environmentalImpactSummary: 'AI vision is disabled (no ANTHROPIC_API_KEY). Cannot verify this action.',
+      isMock: true, provenance: { source: 'mock', model: 'mock', promptVersion: ECO_PROMPT_VERSION },
+    };
   }
 
   try {
-    // Strip data URI prefix if present
     let base64Data = imageBase64;
     let mediaType = 'image/jpeg';
     if (imageBase64.startsWith('data:')) {
-      const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
-      if (match) {
-        mediaType = match[1];
-        base64Data = match[2];
-      }
+      const m = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (m) { mediaType = m[1]; base64Data = m[2]; }
     }
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: ECO_MODEL,
       max_tokens: 1024,
       messages: [{
         role: 'user',
         content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: base64Data },
-          },
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } },
           {
             type: 'text',
-            text: `You are EcoRise's environmental impact analyzer. The user has uploaded an image of an eco-friendly action they took. Analyze the image and extract:
-- actionType (from: transportation, waste, energy, food, nature, other)
-- specificAction (e.g., 'biked to school', 'recycled plastic bottles')
-- requiresFollowUp (boolean — true if you need distance/quantity info)
-- followUpQuestion (e.g., 'How many miles did you bike?')
-- estimatedCO2Saved (in kg, estimate conservatively)
-- environmentalImpactSummary (2-3 sentences explaining the positive impact)
-- pointsCategory breakdown ready to pass to rubric: { category, action }
-Respond ONLY in JSON.`,
+            text: `You are EcoRise's eco-action analyzer. FIRST decide whether this photo genuinely shows a real eco-friendly action (biking/walking/transit, recycling/compost/reusable items, saving energy, a plant-based meal, litter cleanup, planting, etc.).
+Set isEcoAction=false for anything else (selfie, pet, random object, screenshot, meme, ordinary indoor scene, food that is not notably eco). Be strict; when unsure, isEcoAction=false.
+Only if isEcoAction=true, fill the rest. Respond ONLY in JSON:
+{"isEcoAction": boolean, "confidence": number between 0 and 1, "actionType": "transportation|waste|energy|food|nature|other", "specificAction": string, "requiresFollowUp": boolean, "followUpQuestion": string, "estimatedCO2Saved": number_in_kg, "environmentalImpactSummary": string}`,
           },
         ],
       }],
@@ -82,11 +87,29 @@ Respond ONLY in JSON.`,
 
     const text = response.content[0].text;
     const json = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-    return { ...json, isMock: false };
+    const confidence = Math.max(0, Math.min(1, Number(json.confidence ?? 0)));
+    return {
+      isEcoAction: json.isEcoAction === true && confidence >= ECO_CONFIDENCE_FLOOR,
+      confidence,
+      actionType: String(json.actionType || 'other'),
+      specificAction: String(json.specificAction || 'Eco action'),
+      requiresFollowUp: !!json.requiresFollowUp,
+      followUpQuestion: json.followUpQuestion || '',
+      estimatedCO2Saved: Math.max(0, Number(json.estimatedCO2Saved) || 0),
+      environmentalImpactSummary: json.environmentalImpactSummary || '',
+      isMock: false,
+      provenance: { source: 'claude', model: ECO_MODEL, promptVersion: ECO_PROMPT_VERSION, confidence },
+    };
   } catch (err) {
     console.error('AI analyzeEcoAction error:', err.message);
-    const mock = MOCK_ECO_ACTIONS[0];
-    return { ...mock, isMock: true, error: err.message };
+    // On failure, reject rather than fabricate an eco action (no false points).
+    return {
+      isEcoAction: false, confidence: 0, actionType: 'other', specificAction: 'Could not analyze',
+      requiresFollowUp: false, estimatedCO2Saved: 0,
+      environmentalImpactSummary: 'Could not analyze image — please try again.',
+      isMock: true, error: err.message,
+      provenance: { source: 'error', model: ECO_MODEL, promptVersion: ECO_PROMPT_VERSION },
+    };
   }
 }
 
@@ -154,19 +177,57 @@ async function checkQuestMatch(action, quests) {
   }
 }
 
-// ── 4. Rate trash severity ──
+// ── 4. Rate trash severity (with trash / not-trash gate) ──
+
+// Minimum model confidence required to accept a photo as real litter.
+const TRASH_CONFIDENCE_FLOOR = Number(process.env.TRASH_CONFIDENCE_FLOOR || 0.55);
 
 async function rateTrashSeverity(imageBase64) {
   const client = getClient();
 
   if (!client) {
-    const severity = Math.floor(Math.random() * 5) + 4; // 4-8 range
+    // Offline path: prefer the locally-trained CNN (datasets/train_trash_detector.py).
+    if (localTrashModel.isAvailable()) {
+      const r = await localTrashModel.classify(imageBase64);
+      if (r) {
+        const isTrash = r.pTrash >= localTrashModel.TRASH_PROB_THRESHOLD;
+        // No severity labels in training data -> map model confidence to a coarse score.
+        const score = isTrash ? Math.max(1, Math.min(10, Math.round(r.pTrash * 10))) : 0;
+        return {
+          isTrash,
+          confidence: Number(r.pTrash.toFixed(3)),
+          score,
+          description: isTrash
+            ? `Local CNN detected litter (p=${(r.pTrash * 100).toFixed(0)}%). Severity is approximate (confidence-based).`
+            : `Local CNN: this image does not look like litter (p=${(r.pTrash * 100).toFixed(0)}%).`,
+          estimatedItems: isTrash ? 'approx' : '0',
+          isMock: false,
+          source: 'local-cnn',
+        };
+      }
+    }
+
+    // No API key and no local model => do NOT fabricate a score (that is what
+    // produced false positives on non-trash photos).
+    // Set MOCK_TRASH_ALWAYS_PASS=true to restore the old "everything passes"
+    // demo behavior, clearly labelled as fake.
+    if (process.env.MOCK_TRASH_ALWAYS_PASS === 'true') {
+      const severity = Math.floor(Math.random() * 5) + 4; // 4-8
+      return {
+        isTrash: true,
+        confidence: 0,
+        score: severity,
+        description: 'DEMO MODE: AI vision disabled (no API key) — this is NOT a real detection.',
+        estimatedItems: `${severity * 3}-${severity * 5} items`,
+        isMock: true,
+      };
+    }
     return {
-      score: severity,
-      description: severity >= 7
-        ? 'Significant dumping area with multiple large items and widespread litter.'
-        : 'Noticeable accumulation of trash in the area requiring attention.',
-      estimatedItems: `${severity * 3}-${severity * 5} items`,
+      isTrash: false,
+      confidence: 0,
+      score: 0,
+      description: 'AI vision is disabled (no ANTHROPIC_API_KEY). Cannot verify trash — set the key for real detection.',
+      estimatedItems: '0',
       isMock: true,
     };
   }
@@ -194,13 +255,19 @@ async function rateTrashSeverity(imageBase64) {
           },
           {
             type: 'text',
-            text: `Rate the severity and amount of trash in this image on a scale of 0–10. 0 = no visible trash, 10 = severe large-scale illegal dumping. Use this strict scale:
+            text: `You are EcoRise's litter detector. FIRST decide whether this photo genuinely shows litter, trash, or dumped waste in a real outdoor or public setting.
+
+Set isTrash=false (score 0) if the image is anything else — a person, selfie, pet, food, plant, indoor scene, building, screenshot, meme, document, product shot, artwork, or a clean area with no discarded waste. Ordinary objects in normal use are NOT trash. Be strict: when uncertain, isTrash=false.
+
+Only if isTrash=true, rate severity 0-10:
 1-2: A few pieces of litter
 3-4: Noticeable accumulation in a small area
-5-6: Large pile or widespread area with litter
+5-6: Large pile or widespread litter
 7-8: Significant dumping, multiple large items
-9-10: Extreme illegal dumping, hazardous waste
-Respond ONLY in JSON: {score, description, estimatedItems}`,
+9-10: Extreme illegal dumping / hazardous waste
+
+Respond ONLY in JSON:
+{"isTrash": boolean, "confidence": number between 0 and 1, "score": number 0-10, "description": string, "estimatedItems": string}`,
           },
         ],
       }],
@@ -208,10 +275,24 @@ Respond ONLY in JSON: {score, description, estimatedItems}`,
 
     const text = response.content[0].text;
     const json = JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-    return { ...json, isMock: false };
+
+    // Normalize + enforce the gate server-side (never trust the raw score alone).
+    const score = Math.max(0, Math.min(10, Number(json.score) || 0));
+    const confidence = Math.max(0, Math.min(1, Number(json.confidence ?? 0)));
+    const isTrash = json.isTrash === true && score > 0 && confidence >= TRASH_CONFIDENCE_FLOOR;
+
+    return {
+      isTrash,
+      confidence,
+      score: isTrash ? score : 0,
+      description: json.description || (isTrash ? 'Litter detected.' : 'No litter detected in this image.'),
+      estimatedItems: json.estimatedItems || '0',
+      isMock: false,
+    };
   } catch (err) {
     console.error('AI rateTrashSeverity error:', err.message);
-    return { score: 5, description: 'Unable to analyze image.', estimatedItems: 'Unknown', isMock: true, error: err.message };
+    // On failure, reject conservatively rather than award points.
+    return { isTrash: false, confidence: 0, score: 0, description: 'Could not analyze image — please try again.', estimatedItems: '0', isMock: true, error: err.message };
   }
 }
 

@@ -12,6 +12,8 @@ function getDb() {
     db.pragma('journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     initTables();
+    migrate();
+    createIndexes();
   }
   return db;
 }
@@ -37,6 +39,7 @@ function initTables() {
       include_self INTEGER DEFAULT 1,
       invite_code TEXT UNIQUE,
       organizer_id TEXT NOT NULL,
+      season INTEGER DEFAULT 1,
       next_reset TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (organizer_id) REFERENCES users(id)
@@ -45,13 +48,14 @@ function initTables() {
     CREATE TABLE IF NOT EXISTS leaderboard_members (
       leaderboard_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
+      role TEXT DEFAULT 'member',
       points INTEGER DEFAULT 0,
       streak INTEGER DEFAULT 0,
       last_action_date TEXT,
       joined_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (leaderboard_id, user_id),
-      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS posts (
@@ -59,6 +63,7 @@ function initTables() {
       user_id TEXT NOT NULL,
       leaderboard_id TEXT,
       image TEXT DEFAULT '',
+      image_hash TEXT,
       action_type TEXT NOT NULL,
       action_desc TEXT NOT NULL,
       co2_saved REAL DEFAULT 0,
@@ -68,15 +73,16 @@ function initTables() {
       reported INTEGER DEFAULT 0,
       hidden INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS post_likes (
       post_id TEXT NOT NULL,
       user_id TEXT NOT NULL,
       PRIMARY KEY (post_id, user_id),
-      FOREIGN KEY (post_id) REFERENCES posts(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS comments (
@@ -85,8 +91,8 @@ function initTables() {
       user_id TEXT NOT NULL,
       text TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (post_id) REFERENCES posts(id),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS quests (
@@ -101,7 +107,8 @@ function initTables() {
       progress INTEGER DEFAULT 0,
       date TEXT NOT NULL,
       completed INTEGER DEFAULT 0,
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      awarded INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS trash_reports (
@@ -109,13 +116,15 @@ function initTables() {
       user_id TEXT NOT NULL,
       leaderboard_id TEXT,
       image TEXT DEFAULT '',
+      image_hash TEXT,
       severity INTEGER DEFAULT 0,
       description TEXT DEFAULT '',
       estimated_items TEXT DEFAULT '',
       location TEXT DEFAULT '',
       points INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS notifications (
@@ -123,9 +132,10 @@ function initTables() {
       user_id TEXT NOT NULL,
       type TEXT NOT NULL,
       message TEXT NOT NULL,
+      link TEXT DEFAULT '',
       read INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS badges (
@@ -133,8 +143,64 @@ function initTables() {
       user_id TEXT NOT NULL,
       badge_type TEXT NOT NULL,
       earned_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (user_id) REFERENCES users(id)
+      UNIQUE (user_id, badge_type),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS point_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      leaderboard_id TEXT,
+      source TEXT NOT NULL,
+      source_id TEXT,
+      points INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS leaderboard_seasons (
+      id TEXT PRIMARY KEY,
+      leaderboard_id TEXT NOT NULL,
+      season INTEGER NOT NULL,
+      winner_user_id TEXT,
+      standings TEXT DEFAULT '[]',
+      ended_at TEXT DEFAULT (datetime('now')),
+      UNIQUE (leaderboard_id, season),
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
+    );
+  `);
+}
+
+function migrate() {
+  const adds = [
+    ['leaderboards', 'season', 'INTEGER DEFAULT 1'],
+    ['leaderboard_members', 'role', "TEXT DEFAULT 'member'"],
+    ['posts', 'image_hash', 'TEXT'],
+    ['trash_reports', 'image_hash', 'TEXT'],
+    ['quests', 'awarded', 'INTEGER DEFAULT 0'],
+    ['notifications', 'link', "TEXT DEFAULT ''"],
+  ];
+  for (const [table, col, type] of adds) {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch (_) { /* exists */ }
+  }
+}
+
+function createIndexes() {
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_posts_board   ON posts(leaderboard_id, hidden, created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_user    ON posts(user_id);
+    CREATE INDEX IF NOT EXISTS idx_posts_hash    ON posts(user_id, image_hash);
+    CREATE INDEX IF NOT EXISTS idx_comments_post ON comments(post_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_likes_post    ON post_likes(post_id);
+    CREATE INDEX IF NOT EXISTS idx_trash_user    ON trash_reports(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_trash_hash    ON trash_reports(user_id, image_hash);
+    CREATE INDEX IF NOT EXISTS idx_members_board ON leaderboard_members(leaderboard_id, points DESC);
+    CREATE INDEX IF NOT EXISTS idx_notif_user    ON notifications(user_id, read, created_at);
+    CREATE INDEX IF NOT EXISTS idx_quests_user   ON quests(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_ledger_user   ON point_events(user_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_source ON point_events(source, source_id) WHERE source_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_seasons_unique ON leaderboard_seasons(leaderboard_id, season);
   `);
 }
 

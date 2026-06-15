@@ -3,6 +3,7 @@ import React, { useState, useRef } from 'react';
 import Icon from '../components/Icon';
 import { PointsChip } from '../components/UI';
 import { Sheet, UploadFrame } from '../components/Shared';
+import api from '../utils/api';
 
 /* ---------- LOG ECO ACTION ---------- */
 export function LogAction({ ctx }) {
@@ -25,42 +26,21 @@ export function LogAction({ ctx }) {
       setImageData(base64);
       setPhase('analyzing');
 
-      // Send to AI
+      // Single server call analyzes + scores + (unless follow-up needed) creates the post.
       try {
-        const res = await fetch('http://localhost:3001/api/posts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ image: base64, leaderboardId: ctx.leaderboardId }),
-        });
-        const data = await res.json();
-        if (data.needsFollowUp || data.aiResult) {
-          setAiResult(data.aiResult);
+        const data = await api.createPost({ image: base64, leaderboardId: ctx.leaderboardId });
+        if (data.needsFollowUp) {
+          setAiResult(data.aiResult);   // ask for miles; confirm() creates it
           setPhase('result');
-        } else if (data.success) {
-          // Directly completed
-          ctx.onActionComplete(data);
+        } else if (data.accepted === false || data.success === false) {
+          ctx.showToast(data.description || 'That photo does not look like an eco action.');
+          ctx.closeModal();
         } else {
-          // Fallback mock
-          setAiResult({
-            actionType: 'transportation',
-            specificAction: 'Cycling commute',
-            requiresFollowUp: true,
-            followUpQuestion: 'How many miles did you bike?',
-            estimatedCO2Saved: 2.4,
-          });
-          setPhase('result');
+          ctx.onActionComplete(data);   // already created + scored server-side
         }
-      } catch {
-        // Mock fallback
-        setAiResult({
-          actionType: 'transportation',
-          specificAction: 'Cycling commute',
-          requiresFollowUp: true,
-          followUpQuestion: 'How many miles did you bike?',
-          estimatedCO2Saved: 2.4,
-        });
-        setPhase('result');
+      } catch (err) {
+        ctx.showToast(err?.status === 409 ? 'You already logged this photo recently.' : (err.message || 'Could not analyze the photo.'));
+        ctx.closeModal();
       }
     };
     reader.readAsDataURL(file);
@@ -83,29 +63,17 @@ export function LogAction({ ctx }) {
   const confirm = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/posts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          image: imageData,
-          leaderboardId: ctx.leaderboardId,
-          miles: aiResult?.requiresFollowUp ? miles : undefined,
-          caption,
-          actionType: aiResult?.actionType,
-          actionDesc: aiResult?.specificAction,
-          co2Saved: aiResult?.estimatedCO2Saved,
-        }),
+      // Points are computed server-side from the image; we only supply miles.
+      const data = await api.createPost({
+        image: imageData,
+        leaderboardId: ctx.leaderboardId,
+        miles: aiResult?.requiresFollowUp ? miles : undefined,
+        caption,
       });
-      const data = await res.json();
       ctx.onActionComplete(data);
-    } catch {
-      // Offline mock
-      ctx.onActionComplete({
-        success: true, points: 60,
-        aiResult: aiResult,
-        explanation: 'Cycling commute: +60 pts',
-      });
+    } catch (err) {
+      ctx.showToast(err?.status === 409 ? 'You already logged this photo recently.' : (err.message || 'Could not post.'));
+      ctx.closeModal();
     }
     setLoading(false);
   };
@@ -193,11 +161,7 @@ export function TrashSpotter({ ctx }) {
     const reader = new FileReader();
     reader.onload = () => {
       setImageData(reader.result);
-      setPhase('analyzing');
-      setTimeout(() => {
-        setSeverity(Math.floor(Math.random() * 5) + 4);
-        setPhase('result');
-      }, 1300);
+      setPhase('result'); // severity is scored server-side on submit; no fabricated preview
     };
     reader.readAsDataURL(file);
   };
@@ -210,16 +174,12 @@ export function TrashSpotter({ ctx }) {
   const confirm = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/trash', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ image: imageData, location: loc, leaderboardId: ctx.leaderboardId }),
-      });
-      const data = await res.json();
-      ctx.onActionComplete({ success: true, points: data.points || pts, aiResult: { specificAction: 'Trash report', actionType: 'Cleanup' } });
-    } catch {
-      ctx.onActionComplete({ success: true, points: pts, aiResult: { specificAction: 'Trash report', actionType: 'Cleanup' } });
+      // Server runs the trash detector; it may reject (accepted:false) -> no points.
+      const data = await api.reportTrash({ image: imageData, location: loc, leaderboardId: ctx.leaderboardId });
+      ctx.onActionComplete({ ...data, aiResult: { specificAction: 'Trash report', actionType: 'Cleanup' } });
+    } catch (err) {
+      ctx.showToast(err?.status === 409 ? 'You already reported this photo recently.' : (err.message || 'Could not report.'));
+      ctx.closeModal();
     }
     setLoading(false);
   };
@@ -239,16 +199,12 @@ export function TrashSpotter({ ctx }) {
         {phase === 'result' && (
           <>
             <div className="card pop-in" style={{ padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span className="eyebrow" style={{ color: sevColor }}>AI severity rating</span>
-                <span style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 22, color: sevColor }}>{severity}<span className="dim" style={{ fontSize: 14 }}>/10</span></span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon name="sparkle" size={18} color="var(--coral)" />
+                <span className="eyebrow" style={{ color: 'var(--coral)' }}>AI rates severity on submit</span>
               </div>
-              <div style={{ height: 14, borderRadius: 9999, background: 'rgba(255,255,255,.08)', overflow: 'hidden', position: 'relative' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,#00E676,#FFD23F,#FF6B6B)', opacity: .25 }} />
-                <div style={{ height: '100%', width: severity * 10 + '%', borderRadius: 9999, background: 'linear-gradient(90deg,#FFD23F,#FF6B6B)', boxShadow: `0 0 16px ${sevColor}`, transition: 'width .6s' }} />
-              </div>
-              <div className="muted" style={{ fontSize: 13, fontWeight: 600, marginTop: 10 }}>
-                {severity >= 7 ? 'High-priority hotspot — worth reporting to campus grounds.' : 'Moderate litter accumulation detected.'}
+              <div className="muted" style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>
+                Add a location, then submit. The detector verifies it's real litter and scores severity 0–10 server-side. Points are awarded only if it's confirmed.
               </div>
             </div>
 
@@ -259,10 +215,10 @@ export function TrashSpotter({ ctx }) {
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="muted" style={{ fontWeight: 700 }}>Reward</span>
-              <PointsChip pts={pts} variant="green" />
+              <span className="muted" style={{ fontWeight: 700, fontSize: 13 }}>35–85 pts · AI-scored</span>
             </div>
             <button className="btn btn-danger btn-block btn-lg" onClick={confirm} disabled={loading}>
-              <Icon name="pin" size={18} color="#fff" /> {loading ? 'Reporting...' : `Report & earn ${pts} pts`}
+              <Icon name="pin" size={18} color="#fff" /> {loading ? 'Reporting...' : 'Submit report'}
             </button>
           </>
         )}

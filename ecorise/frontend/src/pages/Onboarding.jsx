@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Icon from '../components/Icon';
 import { LogoMark, Wordmark, Orbs } from '../components/Shared';
+import api from '../utils/api';
 
 const ONB_STEPS = [
   { key: 'track', icon: 'camera', color: '#00E676',
@@ -32,21 +33,14 @@ export default function Onboarding({ onAuth }) {
     setError('');
     setLoading(true);
     try {
-      const endpoint = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
       const body = mode === 'signup' ? { email, password, name } : { email, password };
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
-      localStorage.setItem('ecorise_onboarded', '1');
-      localStorage.setItem('ecorise_token', data.token);
-      onAuth(data.user, data.token);
+      const data = mode === 'signup' ? await api.signup(body) : await api.login(body);
+      localStorage.setItem('ecorise_onboarded', '1'); // UI hint only (not auth)
+      onAuth(data.user);
     } catch (err) {
-      setError(err.message);
+      // Surface server validation details when present.
+      const detail = err.data?.details?.[0]?.message;
+      setError(detail ? `${err.message}: ${detail}` : err.message);
     } finally {
       setLoading(false);
     }
@@ -134,16 +128,6 @@ export default function Onboarding({ onAuth }) {
         <p className="muted" style={{ textAlign: 'center', fontWeight: 600, marginTop: 6, marginBottom: 26 }}>
           {mode === 'signup' ? 'Join the race to a greener campus.' : 'Pick up right where you left off.'}
         </p>
-
-        <button className="btn btn-block" style={{ background: '#fff', color: '#1a1a2e', boxShadow: '0 8px 20px rgba(0,0,0,.3)', marginBottom: 12 }} onClick={handleSubmit}>
-          <Icon name="google" size={20} /> Continue with Google
-        </button>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '14px 0' }}>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.1)' }} />
-          <span className="dim" style={{ fontWeight: 700, fontSize: 12 }}>OR</span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.1)' }} />
-        </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
           {mode === 'signup' && (

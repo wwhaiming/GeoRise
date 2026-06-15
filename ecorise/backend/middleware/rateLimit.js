@@ -1,8 +1,9 @@
-/* EcoRise — Rate limiting middleware for AI endpoints */
+/* EcoRise — Rate limiting middleware */
+const rateLimit = require('express-rate-limit');
 
-// In-memory store: { [userId]: { count, resetAt } }
+// Per-user daily cap on AI analyses (in-memory; swap for Redis in production).
 const limits = new Map();
-const MAX_PER_DAY = 20;
+const MAX_PER_DAY = Number(process.env.AI_MAX_PER_DAY || 20);
 
 function aiRateLimit(req, res, next) {
   const userId = req.userId;
@@ -10,14 +11,11 @@ function aiRateLimit(req, res, next) {
 
   const now = Date.now();
   let entry = limits.get(userId);
-
   if (!entry || now > entry.resetAt) {
-    // Reset at midnight
     const tomorrow = new Date();
     tomorrow.setHours(24, 0, 0, 0);
     entry = { count: 0, resetAt: tomorrow.getTime() };
   }
-
   if (entry.count >= MAX_PER_DAY) {
     return res.status(429).json({
       error: 'Rate limit exceeded',
@@ -25,11 +23,19 @@ function aiRateLimit(req, res, next) {
       remaining: 0,
     });
   }
-
   entry.count++;
   limits.set(userId, entry);
   req.aiRemaining = MAX_PER_DAY - entry.count;
   next();
 }
 
-module.exports = { aiRateLimit };
+// Brute-force guard for auth endpoints (per IP).
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_MAX_PER_WINDOW || 30),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Try again later.' },
+});
+
+module.exports = { aiRateLimit, authLimiter, _limits: limits };

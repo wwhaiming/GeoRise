@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test test/api.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -16,8 +17,14 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
+    "jimp": "^1.6.1",
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
-    "uuid": "^11.1.0"
+    "onnxruntime-node": "^1.26.0",
+    "uuid": "^11.1.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

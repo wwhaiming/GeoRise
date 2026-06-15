@@ -200,5 +200,5 @@ Based on the Kahoot-inspired prototype created in Claude Design:
 - JWT tokens in httpOnly cookies (7-day expiry)
 - AI endpoint rate limited: 20 analyses/user/day
 - Image uploads validated (type + 5MB max)
-- User inputs sanitized
-- Reported posts hidden pending review
+- User inputs validated server-side (zod schemas) + parameterized SQL (no string-built queries)
+- Reported posts are flagged for organizer moderation; only the post owner or leaderboard organizer can hide a post
