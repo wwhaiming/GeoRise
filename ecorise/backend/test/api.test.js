@@ -240,3 +240,26 @@ test('ledger is idempotent per source (no double-credit on replay)', async () =>
   const pts = getDb().prepare('SELECT points FROM leaderboard_members WHERE leaderboard_id=? AND user_id=?').get(board.id, a.id).points;
   assert.equal(pts, 50, 'points credited exactly once');
 });
+
+test('join by invite code via /join (no board id): bad/missing code rejected, valid works', async () => {
+  const a = await newUser('CodeOwner'); const b = await newUser('CodeJoiner');
+  const board = await makeBoard(a, 'Code Cup');
+  const bad = await request(app).post('/api/leaderboards/join').set(...auth(b.token)).send({ inviteCode: 'NOPE' });
+  assert.equal(bad.status, 404, 'invalid invite code must be 404');
+  const missing = await request(app).post('/api/leaderboards/join').set(...auth(b.token)).send({});
+  assert.equal(missing.status, 400, 'missing invite code must be 400');
+  const ok = await request(app).post('/api/leaderboards/join').set(...auth(b.token)).send({ inviteCode: board.inviteCode });
+  assert.equal(ok.status, 200, 'valid invite code joins');
+  assert.equal(ok.body.leaderboardId, board.id);
+});
+
+test('eco post response carries AI evidence (integrity + breakdown)', async () => {
+  const a = await newUser('Evidence');
+  const board = await makeBoard(a, 'Evidence Cup');
+  const r = await request(app).post('/api/posts').set(...auth(a.token)).send({ image: png(2025), leaderboardId: board.id, miles: 5 });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(r.body.integrity, 'evidence integrity object present');
+  assert.equal(r.body.integrity.checks.serverScored, 'passed', 'server-scored gate reported');
+  assert.equal(r.body.integrity.checks.aiVisionGate, 'verified', 'AI gate reported as verified');
+  assert.ok(Array.isArray(r.body.breakdown), 'point breakdown present for the evidence panel');
+});

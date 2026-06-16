@@ -34,13 +34,25 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
     if (dup) return res.status(409).json({ error: 'You already reported this photo recently.', reason: 'duplicate', accepted: false, points: 0 });
 
     const severity = await rateTrashSeverity(image);
+    const integrity = {
+      model: severity.model || (severity.source === 'local-cnn' ? 'local-cnn (trained in-repo)' : 'claude'),
+      source: severity.source || (severity.isMock ? 'mock' : 'ai'),
+      confidence: severity.confidence ?? 0,
+      checks: {
+        photoRequired: 'passed',
+        duplicateScreen: 'passed',
+        membershipVerified: leaderboardId ? 'passed' : 'n/a',
+        aiVisionGate: severity.isTrash ? 'verified' : 'rejected',
+        serverScored: 'passed',
+      },
+    };
 
     if (!severity.isTrash) {
       return res.json({
         success: false, accepted: false, reason: 'not_trash', isTrash: false,
         severity: 0, points: 0, confidence: severity.confidence ?? 0,
         description: severity.description || 'This image does not appear to show litter.',
-        aiRemaining: req.aiRemaining,
+        integrity, aiRemaining: req.aiRemaining,
       });
     }
 
@@ -61,7 +73,11 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
       success: true, accepted: true, reportId: id, postId,
       severity: severity.score, description: severity.description, estimatedItems: severity.estimatedItems,
       points, confidence: severity.confidence, source: severity.source || (severity.isMock ? 'mock' : 'ai'),
-      aiRemaining: req.aiRemaining,
+      breakdown: [
+        { label: 'Cleanup report', points: 35 },
+        { label: `Severity ${severity.score}/10 × 5`, points: severity.score * 5 },
+      ],
+      integrity, aiRemaining: req.aiRemaining,
     });
   } catch (err) {
     console.error('Trash report error:', err);

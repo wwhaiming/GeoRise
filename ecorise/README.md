@@ -12,6 +12,7 @@ EcoRise is a competitive environmental leaderboard app for schools and communiti
 
 | Feature | Description |
 |---------|-------------|
+| **AI Evidence Panel** | After **every** submission: which model decided, its confidence, the CO₂ math, the full point breakdown, and every anti-fraud gate the action cleared (or why it was rejected) — the AI's reasoning, made visible |
 | **AI Action Analysis** | Upload a photo → Claude AI detects the eco action, estimates CO₂ saved |
 | **Points Rubric Engine** | Comprehensive scoring across 5 categories (transport, waste, energy, food, nature) |
 | **Social Feed** | Instagram-style cards with likes, comments, @mentions, reporting |
@@ -25,11 +26,11 @@ EcoRise is a competitive environmental leaderboard app for schools and communiti
 
 ## 🛠 Tech Stack
 
-- **Frontend:** React 18 + Vite
+- **Frontend:** React 19 + Vite
 - **Backend:** Node.js + Express
 - **Database:** SQLite (via better-sqlite3)
 - **Auth:** JWT (httpOnly cookies) + bcrypt
-- **AI:** Anthropic Claude API (claude-sonnet-4-6) — works in mock mode without API key
+- **AI:** Anthropic Claude vision (`ECO_MODEL`, default `claude-sonnet-4-6`) for eco analysis + a custom CNN (ONNX) for trash. Without an API key the server **rejects rather than fabricates** points; set `MOCK_ECO_ALWAYS_PASS=true` for a clearly-flagged demo.
 - **Design:** Kahoot-inspired dark navy + neon (Fredoka + Nunito fonts)
 
 ---
@@ -59,6 +60,10 @@ cp .env.example .env
 ```bash
 # Start both frontend + backend
 npm run dev
+
+# OR — one-command judge demo: seed a populated board + login, then run
+npm run demo
+#   login: demo@ecorise.app / demo1234   (board "Greenfield High", invite DEMOECO)
 ```
 
 - **Frontend:** http://localhost:5173
@@ -130,7 +135,8 @@ ecorise/
 | GET | `/api/leaderboards` | List user's leaderboards |
 | GET | `/api/leaderboards/:id` | Get leaderboard with ranked members |
 | PUT | `/api/leaderboards/:id` | Update settings (organizer) |
-| POST | `/api/leaderboards/:id/join` | Join via invite code |
+| POST | `/api/leaderboards/join` | Join via invite code (no board id needed) |
+| POST | `/api/leaderboards/:id/join` | Join via invite code (legacy form) |
 
 ### Posts (Feed)
 | Method | Endpoint | Description |

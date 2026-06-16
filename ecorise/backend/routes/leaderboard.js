@@ -41,6 +41,25 @@ router.post('/', authMiddleware, body('createLeaderboard'), (req, res) => {
   }
 });
 
+// Join by invite code only (no board id in the URL). Cleaner than the legacy
+// POST /:id/join with a throwaway id — the invite link carries everything.
+router.post('/join', authMiddleware, body('join'), (req, res) => {
+  try {
+    const db = getDb();
+    const { inviteCode } = req.valid;
+    if (!inviteCode) return res.status(400).json({ error: 'An invite code is required to join.' });
+    const board = db.prepare('SELECT * FROM leaderboards WHERE invite_code = ?').get(inviteCode);
+    if (!board) return res.status(404).json({ error: 'Invalid invite code.' });
+    const existing = db.prepare('SELECT 1 FROM leaderboard_members WHERE leaderboard_id = ? AND user_id = ?').get(board.id, req.userId);
+    if (existing) return res.json({ message: 'Already a member', leaderboardId: board.id, name: board.name });
+    db.prepare('INSERT INTO leaderboard_members (leaderboard_id, user_id) VALUES (?, ?)').run(board.id, req.userId);
+    res.json({ message: 'Joined successfully', leaderboardId: board.id, name: board.name });
+  } catch (err) {
+    console.error('Join-by-code error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.get('/:id', authMiddleware, (req, res) => {
   try {
     const db = getDb();

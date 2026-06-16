@@ -289,6 +289,7 @@ export function Profile({ ctx }) {
         )}
       </div>
       <div style={{ padding: '18px 16px 100px', display: 'grid', gap: 12 }}>
+        <button className="btn btn-primary btn-block" onClick={() => ctx.go('leaderboard')}><Icon name="trophy" size={18} color="#06281A" /> View leaderboard</button>
         <button className="btn btn-purple btn-block" onClick={() => ctx.go('organizer')}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Create a leaderboard</button>
         <button className="btn btn-secondary btn-block" onClick={ctx.logout}>Log out</button>
       </div>

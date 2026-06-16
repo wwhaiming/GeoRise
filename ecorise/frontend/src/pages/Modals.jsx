@@ -1,7 +1,6 @@
 /* EcoRise — Log Action + Trash Spotter modal sheets */
 import React, { useState, useRef } from 'react';
 import Icon from '../components/Icon';
-import { PointsChip } from '../components/UI';
 import { Sheet, UploadFrame } from '../components/Shared';
 import api from '../utils/api';
 
@@ -32,11 +31,9 @@ export function LogAction({ ctx }) {
         if (data.needsFollowUp) {
           setAiResult(data.aiResult);   // ask for miles; confirm() creates it
           setPhase('result');
-        } else if (data.accepted === false || data.success === false) {
-          ctx.showToast(data.description || 'That photo does not look like an eco action.');
-          ctx.closeModal();
         } else {
-          ctx.onActionComplete(data);   // already created + scored server-side
+          // Accepted OR rejected → the AI Evidence Panel explains the verdict.
+          ctx.onActionComplete(data, base64);
         }
       } catch (err) {
         ctx.showToast(err?.status === 409 ? 'You already logged this photo recently.' : (err.message || 'Could not analyze the photo.'));
@@ -70,7 +67,7 @@ export function LogAction({ ctx }) {
         miles: aiResult?.requiresFollowUp ? miles : undefined,
         caption,
       });
-      ctx.onActionComplete(data);
+      ctx.onActionComplete(data, imageData);
     } catch (err) {
       ctx.showToast(err?.status === 409 ? 'You already logged this photo recently.' : (err.message || 'Could not post.'));
       ctx.closeModal();
@@ -175,8 +172,9 @@ export function TrashSpotter({ ctx }) {
     setLoading(true);
     try {
       // Server runs the trash detector; it may reject (accepted:false) -> no points.
+      // The AI Evidence Panel renders the real severity/confidence it returns.
       const data = await api.reportTrash({ image: imageData, location: loc, leaderboardId: ctx.leaderboardId });
-      ctx.onActionComplete({ ...data, aiResult: { specificAction: 'Trash report', actionType: 'Cleanup' } });
+      ctx.onActionComplete(data, imageData);
     } catch (err) {
       ctx.showToast(err?.status === 409 ? 'You already reported this photo recently.' : (err.message || 'Could not report.'));
       ctx.closeModal();

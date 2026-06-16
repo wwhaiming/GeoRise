@@ -36,7 +36,10 @@ const MOCK_QUESTS = [
 
 // ── 1. Analyze eco action image ──
 
-const ECO_MODEL = 'claude-sonnet-4-6';
+// Single, env-configurable Claude model for every vision/text call, so a judge
+// can repoint it via ECO_MODEL without editing code (no scattered literals).
+const MODEL = process.env.ECO_MODEL || 'claude-sonnet-4-6';
+const ECO_MODEL = MODEL;
 const ECO_PROMPT_VERSION = '2026-06-15.gate-v1';
 const ECO_CONFIDENCE_FLOOR = Number(process.env.ECO_CONFIDENCE_FLOOR || 0.5);
 
@@ -124,7 +127,7 @@ async function generateDailyQuests(userId) {
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL,
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -161,7 +164,7 @@ async function checkQuestMatch(action, quests) {
 
   try {
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL,
       max_tokens: 512,
       messages: [{
         role: 'user',
@@ -203,6 +206,7 @@ async function rateTrashSeverity(imageBase64) {
           estimatedItems: isTrash ? 'approx' : '0',
           isMock: false,
           source: 'local-cnn',
+          model: 'local-cnn (trained in-repo)',
         };
       }
     }
@@ -220,6 +224,8 @@ async function rateTrashSeverity(imageBase64) {
         description: 'DEMO MODE: AI vision disabled (no API key) — this is NOT a real detection.',
         estimatedItems: `${severity * 3}-${severity * 5} items`,
         isMock: true,
+        source: 'mock',
+        model: 'demo (no model)',
       };
     }
     return {
@@ -229,6 +235,8 @@ async function rateTrashSeverity(imageBase64) {
       description: 'AI vision is disabled (no ANTHROPIC_API_KEY). Cannot verify trash — set the key for real detection.',
       estimatedItems: '0',
       isMock: true,
+      source: 'disabled',
+      model: 'none',
     };
   }
 
@@ -244,7 +252,7 @@ async function rateTrashSeverity(imageBase64) {
     }
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL,
       max_tokens: 512,
       messages: [{
         role: 'user',
@@ -288,11 +296,13 @@ Respond ONLY in JSON:
       description: json.description || (isTrash ? 'Litter detected.' : 'No litter detected in this image.'),
       estimatedItems: json.estimatedItems || '0',
       isMock: false,
+      source: 'claude',
+      model: MODEL,
     };
   } catch (err) {
     console.error('AI rateTrashSeverity error:', err.message);
     // On failure, reject conservatively rather than award points.
-    return { isTrash: false, confidence: 0, score: 0, description: 'Could not analyze image — please try again.', estimatedItems: '0', isMock: true, error: err.message };
+    return { isTrash: false, confidence: 0, score: 0, description: 'Could not analyze image — please try again.', estimatedItems: '0', isMock: true, source: 'error', model: MODEL, error: err.message };
   }
 }
 

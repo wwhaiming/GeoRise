@@ -5,7 +5,7 @@ import Icon from './Icon';
 const NAV = [
   { key: 'home', label: 'Home', icon: 'home' },
   { key: 'feed', label: 'Feed', icon: 'feed' },
-  { key: 'leaderboard', label: 'Ranks', icon: 'trophy' },
+  { key: 'quests', label: 'Quests', icon: 'bolt' },
   { key: 'profile', label: 'Profile', icon: 'user' },
 ];
 

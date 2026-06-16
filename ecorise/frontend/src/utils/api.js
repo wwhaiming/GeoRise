@@ -36,6 +36,7 @@ export const api = {
   getLeaderboard: (id) => apiFetch(`/api/leaderboards/${id}`),
   updateLeaderboard: (id, body) => apiFetch(`/api/leaderboards/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   joinLeaderboard: (id, inviteCode) => apiFetch(`/api/leaderboards/${id}/join`, { method: 'POST', body: JSON.stringify({ inviteCode }) }),
+  joinByCode: (inviteCode) => apiFetch('/api/leaderboards/join', { method: 'POST', body: JSON.stringify({ inviteCode }) }),
   listLeaderboards: () => apiFetch('/api/leaderboards'),
   getSeasons: (id) => apiFetch(`/api/leaderboards/${id}/seasons`),
 

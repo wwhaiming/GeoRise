@@ -9,9 +9,30 @@ const { analyzeEcoAction, checkQuestMatch } = require('../utils/aiClient');
 const { processEcoAction } = require('../utils/pointsEngine');
 const { imageHash } = require('../utils/imageHash');
 const { body, pageParams } = require('../utils/validate');
+const analysisCache = require('../utils/analysisCache');
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// The "AI evidence" a judge sees after every submission: which model decided,
+// how confident it was, and every integrity gate the action had to clear. This
+// is what makes the AI's reasoning visible instead of buried in the backend.
+function buildIntegrity(aiResult, { lbId }) {
+  const p = aiResult.provenance || {};
+  return {
+    model: p.model || (aiResult.isMock ? 'demo (no model)' : 'claude'),
+    source: p.source || (aiResult.isMock ? 'mock' : 'claude'),
+    confidence: aiResult.confidence ?? 0,
+    promptVersion: p.promptVersion || null,
+    checks: {
+      photoRequired: 'passed',
+      duplicateScreen: 'passed',
+      membershipVerified: lbId ? 'passed' : 'n/a',
+      aiVisionGate: aiResult.isEcoAction ? 'verified' : 'rejected',
+      serverScored: 'passed',
+    },
+  };
+}
 
 function postBoardOrganizer(db, postId) {
   return db.prepare(`SELECT l.organizer_id FROM posts p JOIN leaderboards l ON l.id = p.leaderboard_id WHERE p.id = ?`).get(postId)?.organizer_id || null;
@@ -42,20 +63,28 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
     const dup = db.prepare("SELECT id FROM posts WHERE user_id = ? AND image_hash = ? AND created_at > datetime('now','-1 day')").get(req.userId, hash);
     if (dup) return res.status(409).json({ error: 'You already logged this photo recently.', reason: 'duplicate', accepted: false, points: 0 });
 
-    const aiResult = await analyzeEcoAction(image);
+    // Reuse the verified analysis if this same photo was just analyzed (e.g. the
+    // follow-up "how many miles?" round-trip) — never re-run the model or trust a
+    // client-supplied verdict. Falls through to a fresh analysis on a cache miss.
+    let aiResult = analysisCache.get(req.userId, hash);
+    if (!aiResult) {
+      aiResult = await analyzeEcoAction(image);
+      analysisCache.set(req.userId, hash, aiResult);
+    }
+    const integrity = buildIntegrity(aiResult, { lbId });
 
     if (aiResult.isEcoAction === false) {
       return res.json({
         success: false, accepted: false, reason: 'not_eco_action', points: 0,
         confidence: aiResult.confidence ?? 0,
         description: aiResult.environmentalImpactSummary || 'This photo does not look like an eco action.',
-        aiRemaining: req.aiRemaining,
+        aiResult, integrity, aiRemaining: req.aiRemaining,
       });
     }
 
     const miles = v.miles || 0;
     if (aiResult.requiresFollowUp && !miles) {
-      return res.json({ needsFollowUp: true, aiResult, followUpQuestion: aiResult.followUpQuestion });
+      return res.json({ needsFollowUp: true, aiResult, integrity, followUpQuestion: aiResult.followUpQuestion });
     }
 
     // Parse + validate tags (max 3 real uuids that exist, never self).
@@ -82,10 +111,14 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
       questUpdate = questMatch;
     }
 
+    // Photo committed; drop the cached analysis so a fresh upload re-analyzes.
+    analysisCache.clear(req.userId, hash);
+
     res.json({
       success: true, accepted: true, postId: result.postId, points: result.points,
-      breakdown: result.breakdown, explanation: result.explanation, aiResult,
-      questUpdate, aiRemaining: req.aiRemaining,
+      breakdown: result.breakdown, bonuses: result.bonuses, multiplier: result.multiplier,
+      explanation: result.explanation, co2Saved: aiResult.estimatedCO2Saved || 0,
+      aiResult, integrity, questUpdate, aiRemaining: req.aiRemaining,
     });
   } catch (err) {
     console.error('Create post error:', err);

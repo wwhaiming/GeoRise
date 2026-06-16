@@ -52,6 +52,7 @@ GeoRise/
 
 ## ✨ Features
 
+- **AI Evidence Panel** — after **every** submission you see the model's verdict: what it detected, its confidence, the CO₂ math, the full point breakdown, and every anti-fraud gate the action cleared (or exactly why it was rejected). The AI's reasoning is the centerpiece of the UX, not a black box.
 - **AI action analysis** — photo → Claude detects the action + estimates CO₂.
 - **Trash Spotter** — photo → a trained CNN verifies it's real litter and scores severity 0–10.
 - **Rubric points engine** — 5 categories, three scoring shapes, CO₂ bonus, streak/first-action multipliers.
@@ -103,6 +104,8 @@ cp .env.example .env         # then set a strong JWT_SECRET (required):
 #   optional: ANTHROPIC_API_KEY=...   (eco analysis; trash model works offline)
 
 npm run dev                  # backend :3001 + frontend :5173
+npm run demo                 # one-command judge demo: seeds a populated board
+                             #   + login (demo@ecorise.app / demo1234), then runs
 ```
 
 ### Tests

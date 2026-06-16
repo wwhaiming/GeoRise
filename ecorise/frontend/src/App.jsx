@@ -8,8 +8,10 @@ import { fireConfetti } from './components/Confetti';
 
 import Onboarding from './pages/Onboarding';
 import Home from './pages/Home';
+import Quests from './pages/Quests';
 import { Feed, Leaderboard, Profile, Organizer } from './pages/Pages';
 import { LogAction, TrashSpotter } from './pages/Modals';
+import AIEvidence from './components/AIEvidence';
 
 import api from './utils/api';
 
@@ -56,6 +58,7 @@ export default function App() {
   // App state
   const [screen, setScreen] = useState('onboarding');
   const [modal, setModal] = useState(null);
+  const [evidence, setEvidence] = useState(null);   // AI Evidence Panel payload
   const [toast, setToast] = useState(null);
   const [bump, setBump] = useState(null);
 
@@ -128,7 +131,7 @@ export default function App() {
 
   const consumePendingInvite = useCallback(() => {
     if (!PENDING_INVITE) return;
-    api.joinLeaderboard(null, PENDING_INVITE).then(r => {
+    api.joinByCode(PENDING_INVITE).then(r => {
       window.history.replaceState({}, '', '/');
       showToast(`Joined ${r.name || 'the leaderboard'}!`);
       loadData();
@@ -189,21 +192,28 @@ export default function App() {
     consumePendingInvite();
   };
 
-  // ── Action complete ──
-  const onActionComplete = (data) => {
+  // Predict the rank you move to after gaining `delta` points (for the Evidence
+  // Panel's leaderboard animation), computed from the current standings.
+  const computeRankMove = (delta) => {
+    const you = members.find(m => m.isYou);
+    const beforeRank = you?.rank || (members.length + 1);
+    const beforePoints = you?.points || 0;
+    const afterPoints = beforePoints + delta;
+    const afterRank = members.filter(m => !m.isYou && (m.points || 0) > afterPoints).length + 1;
+    return { beforeRank, afterRank, beforePoints, afterPoints };
+  };
+
+  // ── Action complete → open the AI Evidence Panel (accepted OR rejected) ──
+  const onActionComplete = (data, photo) => {
     setModal(null);
-    // Honor server rejection — never fabricate points.
-    if (!data || data.accepted === false || data.success === false) {
-      showToast(data?.description || 'Not accepted — try another photo');
-      return;
+    const accepted = !(!data || data.accepted === false || data.success === false);
+    const kind = data && (data.severity !== undefined || data.reportId) ? 'trash' : 'eco';
+    let rankMove = null;
+    if (accepted) {
+      const pts = Number(data.points) || 0;
+      if (pts > 0) { rankMove = computeRankMove(pts); addPoints(pts); }
     }
-    const pts = Number(data.points) || 0;
-    if (pts > 0) {
-      addPoints(pts);
-      showToast(`+${pts} pts · ${data.aiResult?.specificAction || data.description || 'Eco action'}`);
-    } else {
-      showToast('Logged');
-    }
+    setEvidence({ ...data, accepted, kind, photo, rankMove });
     loadData();
   };
 
@@ -271,7 +281,7 @@ export default function App() {
     switch (screen) {
       case 'home': return <Home ctx={ctx} />;
       case 'feed': return <Feed ctx={ctx} />;
-      case 'quests': return <Home ctx={ctx} />;
+      case 'quests': return <Quests ctx={ctx} />;
       case 'leaderboard': return <Leaderboard ctx={ctx} />;
       case 'profile': return <Profile ctx={ctx} />;
       case 'organizer': return <Organizer ctx={ctx} />;
@@ -287,6 +297,7 @@ export default function App() {
       {showNav && <BottomNav screen={screen} go={go} onFab={() => setModal('log')} />}
       {modal === 'log' && <LogAction ctx={ctx} />}
       {modal === 'trash' && <TrashSpotter ctx={ctx} />}
+      {evidence && <AIEvidence data={evidence} onClose={() => setEvidence(null)} />}
       <Toast toast={toast} />
     </div>
   );

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "seed": "node scripts/seedDemo.js",
     "test": "node --test test/api.test.js"
   },
   "dependencies": {
