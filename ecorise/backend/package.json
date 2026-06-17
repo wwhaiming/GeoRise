@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "node server.js",
     "seed": "node scripts/seedDemo.js",
+    "seed:coach": "node scripts/seedCoachCorpus.js",
     "test": "node --test test/*.test.js",
     "test:eval": "node test/eco_eval/runEval.js"
   },

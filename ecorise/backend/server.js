@@ -28,6 +28,7 @@ getDb();
 console.log('✅ Database initialized');
 
 app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/coach', require('./routes/coach'));   // gated behind COACH_ENABLED (see docs/AI_ECO_COACH_PLAN.md)
 app.use('/api/leaderboards', require('./routes/leaderboard'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/quests', require('./routes/quests'));

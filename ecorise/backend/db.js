@@ -169,11 +169,44 @@ function initTables() {
       UNIQUE (leaderboard_id, season),
       FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
     );
+
+    -- AI Eco Coach (plan: docs/AI_ECO_COACH_PLAN.md). Created here so the seed +
+    -- source-approval routes have their tables, but the feature stays gated behind
+    -- COACH_ENABLED and awards no points until the faithfulness/cap work lands.
+    CREATE TABLE IF NOT EXISTS eco_sources (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      authors TEXT DEFAULT '',
+      institution TEXT DEFAULT '',
+      url TEXT DEFAULT '',
+      provenance TEXT NOT NULL,            -- upload | open_access | agency | synthetic_demo
+      license TEXT DEFAULT '',
+      pub_year INTEGER,
+      topic_tags TEXT DEFAULT '[]',
+      owner_user_id TEXT,
+      course_id TEXT DEFAULT '',
+      status TEXT DEFAULT 'pending',       -- pending | approved | rejected
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS eco_source_chunks (
+      id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      ord INTEGER NOT NULL,
+      text TEXT NOT NULL,
+      embedding BLOB,
+      token_count INTEGER DEFAULT 0,
+      topic_tags TEXT DEFAULT '[]',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (source_id) REFERENCES eco_sources(id) ON DELETE CASCADE
+    );
   `);
 }
 
 function migrate() {
   const adds = [
+    ['users', 'role', "TEXT DEFAULT 'user'"],   // user | teacher | admin (coach source approval)
     ['leaderboards', 'season', 'INTEGER DEFAULT 1'],
     ['leaderboard_members', 'role', "TEXT DEFAULT 'member'"],
     ['posts', 'image_hash', 'TEXT'],
@@ -202,6 +235,8 @@ function createIndexes() {
     CREATE INDEX IF NOT EXISTS idx_ledger_user   ON point_events(user_id, created_at);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_source ON point_events(source, source_id) WHERE source_id IS NOT NULL;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_seasons_unique ON leaderboard_seasons(leaderboard_id, season);
+    CREATE INDEX IF NOT EXISTS idx_chunks_source  ON eco_source_chunks(source_id);
+    CREATE INDEX IF NOT EXISTS idx_sources_status ON eco_sources(status, course_id);
   `);
 }
 
