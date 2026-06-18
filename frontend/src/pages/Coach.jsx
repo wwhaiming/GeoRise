@@ -6,7 +6,6 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from '../components/Icon';
-import ResearchLibrary from '../components/ResearchLibrary';
 import api from '../utils/api';
 
 function nowMs() {
@@ -111,7 +110,7 @@ function Metric({ label, value, sub }) {
   return (
     <div className="card" style={{ padding: 12, minWidth: 0 }}>
       <div className="eyebrow" style={{ color: 'var(--text-dim)', fontSize: 10 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--display)', fontSize: 24, fontWeight: 700, color: 'var(--green-d)', lineHeight: 1.05, marginTop: 4 }}>{value}</div>
+      <div style={{ fontFamily: 'var(--display)', fontSize: 'clamp(16px, 5.2vw, 24px)', fontWeight: 700, color: 'var(--green-d)', lineHeight: 1.05, marginTop: 4, overflowWrap: 'anywhere' }}>{value}</div>
       <div className="muted" style={{ fontSize: 11.5, fontWeight: 700, marginTop: 4, lineHeight: 1.25 }}>{sub}</div>
     </div>
   );
@@ -182,16 +181,16 @@ function CoachCommandCenter({ footprint, openLog }) {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 18, rowGap: 16, marginTop: 18 }}>
           <FlowStep icon="camera" title="Input" body="school posts, board stats, action photos" />
           <FlowStep icon="sparkle" title="AI reasoning" body="retrieval, pattern finding, recommendation" />
           <FlowStep icon="leaf" title="Insight" body="cited question, gap, practical next step" />
           <FlowStep icon="check" title="Action" body="human-visible proof and capped points" />
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginTop: 18 }}>
           {RUBRIC_SIGNALS.map(([label, body]) => (
-            <span key={label} className="chip chip-green" style={{ fontSize: 10.5 }}>
+            <span key={label} className="chip chip-green" style={{ fontSize: 11, padding: '7px 14px', lineHeight: 1.3 }}>
               {label}: {body}
             </span>
           ))}
@@ -374,16 +373,6 @@ export default function Coach({ ctx }) {
             </div>
           )}
 
-          <ResearchLibrary showToast={showToast} />
-
-          <div style={{ padding: '16px 16px 0' }}>
-            <div className="card" style={{ padding: 15, border: '1px solid rgba(182,111,77,.22)' }}>
-              <div className="eyebrow" style={{ color: 'var(--coral-d)', marginBottom: 6 }}>Responsible AI guardrails</div>
-              <div className="muted" style={{ fontSize: 13, fontWeight: 650, lineHeight: 1.45 }}>
-                The coach cannot award unlimited points or invent sources. Learning points are capped, citations are shown, impact math stays deterministic, and organizers keep human review over boards, source approval, and moderation.
-              </div>
-            </div>
-          </div>
         </>
       )}
 

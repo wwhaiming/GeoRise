@@ -72,8 +72,8 @@ async function analyzeEcoAction(imageBase64) {
   }
 
   try {
-    const text = `You are EcoRise's eco-action analyzer. FIRST decide whether this photo genuinely shows a real eco-friendly action (biking/walking/transit, recycling/compost/reusable items, saving energy, a plant-based meal, litter cleanup, planting, etc.).
-Set isEcoAction=false for anything else (selfie, pet, random object, screenshot, meme, ordinary indoor scene, food that is not notably eco). Be strict; when unsure, isEcoAction=false.
+    const text = `You are GeoRise's eco-action analyzer. Decide whether this photo plausibly shows or relates to an eco-friendly action (biking/walking/transit or a bike/bus/train, recycling/compost bins, reusable items like bottles/bags/containers, energy saving, a plant-forward meal, litter cleanup, planting/gardening/being in nature, etc.).
+Lean toward isEcoAction=true and give the user the benefit of the doubt whenever the photo could reasonably represent one of these. Only set isEcoAction=false for photos that are clearly NOT eco-related (a face selfie, a meme or screenshot, a pet with nothing else, a document, or an unrelated indoor object).
 
 IMPORTANT: You do NOT estimate the CO2 saved. A separate deterministic carbon engine computes that from emission factors. Your job is to identify the action and extract the MEASURABLE ATTRIBUTES the engine needs. Put unknown numeric values as null and set requiresFollowUp=true with a followUpQuestion to collect them.
 

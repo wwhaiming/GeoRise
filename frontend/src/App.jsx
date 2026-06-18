@@ -13,6 +13,7 @@ import { Feed, Leaderboard, Profile, Organizer } from './pages/Pages';
 import { LogAction, TrashSpotter } from './pages/Modals';
 import AIEvidence from './components/AIEvidence';
 import Coach from './pages/Coach';
+import Research from './pages/Research';
 
 import api from './utils/api';
 
@@ -327,6 +328,7 @@ export default function App() {
       case 'leaderboard': return <Leaderboard ctx={ctx} />;
       case 'profile': return <Profile ctx={ctx} />;
       case 'coach': return <Coach ctx={ctx} />;
+      case 'research': return <Research ctx={ctx} />;
       case 'organizer': return <Organizer ctx={ctx} />;
       default: return <Coach ctx={ctx} />;
     }

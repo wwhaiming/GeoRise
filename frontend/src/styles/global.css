@@ -39,7 +39,11 @@ html, body, #root {
   margin: 0 auto;
   background: var(--navy-900);
   display: flex; flex-direction: column;
-  position: relative; overflow: hidden;
+  /* clip, not hidden: an overflow:hidden box is still programmatically scrollable, so
+     focus()/scrollIntoView on a child (e.g. restoring focus when a modal closes) would
+     scroll .app and shift the content + nav up, leaving a void below the nav. clip is
+     not a scroll container, so the frame can never scroll. The .scroll child still scrolls. */
+  position: relative; overflow: clip;
   font-family: var(--body);
   isolation: isolate;
   border-left: 1px solid rgba(45,91,57,.10);
