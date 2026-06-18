@@ -77,9 +77,14 @@ the budget on the additive pieces a harsh judge actually grades. Full design: do
   landing: kept Coach as the universal entry (footprint hero + teacher controls via Privacy Center) — a
   design decision, not a divergent landing. Phase 4 considered COMPLETE.
 
-### Phase 5 — Scale honesty
-- ☐ real vector index (sqlite-vec/pgvector) OR explicitly document brute-force as a demo choice with
-  a migration path; per-school/role/endpoint quotas + cost note; disaster-mode handling + smoke load test.
+### Phase 5 — Scale honesty  ☑ DONE (2026-06-18)
+- ☑ docs/SCALE.md: brute-force cosine documented as a deliberate demo-scale choice with MEASURED numbers
+  (npm run loadtest -> ~10k q/s, p50 ~0.11ms over the demo corpus) + a localized migration path
+  (sqlite-vec / pgvector; retrieve() is the only NN site). Quotas + cost note (global 300/15min, per-user
+  AI cap MAX_PER_DAY, OpenAI 30s timeout + 2 retries, embeddings amortized at ingest). Disaster modes
+  (offline mock + ONNX CNN, embedding dim-mismatch fail-close, faithfulness/claim gate, COACH_ENABLED
+  gate + startup self-check). scripts/loadSmoke.js (npm run loadtest). Honest limit stated: single-node
+  SQLite, no real production load test beyond the smoke test.
 
 ### Phase 6 — Submission
 - ☐ mermaid architecture; DEMO_SCRIPT (digest-first order); comparison table; one sticky hook;

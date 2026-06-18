@@ -11,7 +11,8 @@
     "seed:research": "node scripts/ingestResearchCorpus.js",
     "test": "node --test test/*.test.js",
     "test:eval": "node test/eco_eval/runEval.js",
-    "test:coach-eval": "node test/coach_eval/runEval.js"
+    "test:coach-eval": "node test/coach_eval/runEval.js",
+    "loadtest": "node scripts/loadSmoke.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
