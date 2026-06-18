@@ -17,7 +17,13 @@ const { extractJson } = require('./jsonExtract');
 
 function getClient() {
   if (!process.env.OPENAI_API_KEY || !OpenAI) return null;
-  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  // Bound every call: a hung OpenAI request must not pin a server worker. Per-request
+  // timeout + a small retry budget cover analyze/trash/coach/embeddings uniformly.
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: Number(process.env.OPENAI_TIMEOUT_MS || 30000),
+    maxRetries: Number(process.env.OPENAI_MAX_RETRIES || 2),
+  });
 }
 
 // Build an OpenAI vision message (text + image) from a data URI / base64.
@@ -258,79 +264,9 @@ async function adversarialCritique(imageBase64) {
   }
 }
 
-// ── 6. Conversational chat assistant (multi-turn photo verification) ──
-const CHAT_SYSTEM_PROMPT = `You are EcoRise's friendly, conversational AI Assistant.
-A user has uploaded a photo to log an eco-friendly action (biking/walking/transit, recycling/compost/reusable items, saving energy, a plant-based meal, litter cleanup, planting, etc.).
-Your job is to chat with them to:
-1. Verify if the action in the photo is actually eco-friendly.
-2. Gather any missing details if needed (for transportation actions, ask for distance/miles; for others, ask for specific actions if unclear).
-3. Be friendly, encouraging, and conversational.
-4. Keep the conversation short: usually 1-3 turns.
-
-IMPORTANT: You MUST respond ONLY in JSON format on every turn:
-{
-  "message": "Your conversational response to the user. Ask questions or wrap up and congratulate them.",
-  "isComplete": boolean,
-  "actionType": "transportation|waste|energy|food|nature|none",
-  "specificAction": "Short description of the verified action",
-  "estimatedCO2Saved": number,
-  "points": number,
-  "miles": number (for transportation actions, the estimated or user-reported distance in miles; set to 0 or omit otherwise)
-}`;
-
-function simulateMockChat(messages) {
-  const userMessages = messages.filter(m => m.role === 'user');
-  if (userMessages.length <= 1) {
-    return { message: "Hey! I see your photo. It looks like you're doing something green! What eco-friendly action are you taking here? (e.g., did you bike/walk/transit somewhere, or reuse a bottle?)", isComplete: false, actionType: 'none', specificAction: '', estimatedCO2Saved: 0, points: 0, miles: 0 };
-  }
-  const lastUserText = (userMessages[userMessages.length - 1].content || '').toLowerCase();
-  const isTransport = /bike|cycle|walk|run|transit|bus|train/.test(lastUserText);
-  if (isTransport) {
-    const milesMatch = lastUserText.match(/(\d+(\.\d+)?)/);
-    const miles = milesMatch ? parseFloat(milesMatch[1]) : 5;
-    const co2 = +(miles * 0.4).toFixed(1);
-    const points = Math.min(40, Math.max(15, Math.round(15 + miles * 0.8 + co2 * 2)));
-    let activity = 'Green transit';
-    if (/bike|cycle/.test(lastUserText)) activity = 'Biking commute';
-    else if (/walk|run/.test(lastUserText)) activity = 'Walking commute';
-    else if (/bus|train|transit/.test(lastUserText)) activity = 'Public transit ride';
-    return { message: `That's amazing! Choosing ${activity} for ${miles} miles is a fantastic way to cut down carbon emissions. This saves about ${co2} kg of CO2 and earns you ${points} points. Ready to log this action?`, isComplete: true, actionType: 'transportation', specificAction: activity, estimatedCO2Saved: co2, points, miles };
-  }
-  if (/bottle|bag|refill|recycle|compost|litter|cleanup/.test(lastUserText)) {
-    return { message: 'Great job! Reducing waste by recycling, composting, or using reusable items helps save resource consumption. This saves about 0.5 kg of CO2 and earns you 20 points! Ready to log?', isComplete: true, actionType: 'waste', specificAction: /compost/.test(lastUserText) ? 'Composting waste' : /litter|cleanup/.test(lastUserText) ? 'Litter cleanup' : 'Waste reduction', estimatedCO2Saved: 0.5, points: 20, miles: 0 };
-  }
-  if (/meal|vegan|vegetarian|plant|eat/.test(lastUserText)) {
-    return { message: 'Delicious! Eating plant-based meals significantly lowers water usage and agricultural greenhouse gases. This saves about 1.8 kg of CO2 and earns you 25 points! Ready to log?', isComplete: true, actionType: 'food', specificAction: 'Plant-based meal', estimatedCO2Saved: 1.8, points: 25, miles: 0 };
-  }
-  return { message: "Thank you for explaining! That definitely counts as a positive step for our planet. I've logged this action and awarded you 15 points. Ready to submit?", isComplete: true, actionType: 'nature', specificAction: 'Eco action', estimatedCO2Saved: 0.3, points: 15, miles: 0 };
-}
-
-async function chatEcoAction(messages, imageBase64) {
-  const client = getClient();
-  if (!client) return simulateMockChat(messages);
-  try {
-    const apiMessages = [{ role: 'system', content: CHAT_SYSTEM_PROMPT }];
-    let imageIncluded = false;
-    for (const msg of messages) {
-      if (msg.role === 'user' && !imageIncluded && imageBase64) {
-        apiMessages.push({ role: 'user', content: visionContent(msg.content || 'Here is the photo of my eco action.', imageBase64) });
-        imageIncluded = true;
-      } else {
-        apiMessages.push({ role: msg.role, content: msg.content });
-      }
-    }
-    if (apiMessages.length === 1 && imageBase64) {
-      apiMessages.push({ role: 'user', content: visionContent('Analyze this photo of my eco-friendly action.', imageBase64) });
-    }
-    const response = await client.chat.completions.create({ model: ECO_MODEL, max_tokens: 1024, messages: apiMessages, response_format: { type: 'json_object' } });
-    const json = extractJson(response.choices[0].message.content);
-    return { message: String(json.message || 'I see.'), isComplete: !!json.isComplete, actionType: String(json.actionType || 'none'), specificAction: String(json.specificAction || ''), estimatedCO2Saved: Math.max(0, Number(json.estimatedCO2Saved) || 0), points: Math.max(0, Number(json.points) || 0), miles: Math.max(0, Number(json.miles) || 0) };
-  } catch (err) {
-    console.error('AI chatEcoAction error:', err.message);
-    return { message: 'Oh no, I encountered an issue analyzing your request. Could you explain what you are doing in this photo?', isComplete: false, actionType: 'none', specificAction: '', estimatedCO2Saved: 0, points: 0, miles: 0, error: err.message };
-  }
-}
-
+// ── 6. (removed) Conversational chat assistant — dead code, deleted in Phase 4.
+//      The eco-action flow is analyzeEcoAction (perception) + the deterministic
+//      carbon engine; the multi-turn chat was never wired to a route.
 // ── 7. AI Eco Coach: question + guidance generation (RAG) ──
 const COACH_MODEL = process.env.COACH_MODEL || MODEL;
 
@@ -493,6 +429,6 @@ Respond ONLY in JSON: {"headline":"punchy title (<=8 words)","subtitle":"one-lin
 
 module.exports = {
   analyzeEcoAction, generateDailyQuests, checkQuestMatch, rateTrashSeverity, adversarialCritique,
-  chatEcoAction, generateCoachQuestion, generateCoachGuidance,
+  generateCoachQuestion, generateCoachGuidance,
   answerFromSources, summarizePaper, paperVisual,
 };

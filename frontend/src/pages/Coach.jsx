@@ -50,14 +50,6 @@ const ACTION_MAP = {
   learning: 'Answer one cited question, then convert it into one verified action.',
 };
 
-const RUBRIC_SIGNALS = [
-  ['Problem', 'school-specific hidden footprint'],
-  ['AI', 'pattern + source-backed recommendation'],
-  ['Design', 'input -> AI -> insight -> action'],
-  ['Impact', 'verified actions and leaderboard movement'],
-  ['Responsible', 'citations, caps, human review'],
-];
-
 function normalizeCategory(post) {
   const raw = String(post?.action_type || post?.category || '').toLowerCase();
   return CATEGORY_LABELS[raw] || raw || 'action';
@@ -187,14 +179,6 @@ function CoachCommandCenter({ footprint, openLog }) {
           <FlowStep icon="sparkle" title="AI reasoning" body="retrieval, pattern finding, recommendation" />
           <FlowStep icon="leaf" title="Insight" body="cited question, gap, practical next step" />
           <FlowStep icon="check" title="Action" body="human-visible proof and capped points" />
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginTop: 18 }}>
-          {RUBRIC_SIGNALS.map(([label, body]) => (
-            <span key={label} className="chip chip-green" style={{ fontSize: 11, padding: '7px 14px', lineHeight: 1.3 }}>
-              {label}: {body}
-            </span>
-          ))}
         </div>
       </div>
     </div>

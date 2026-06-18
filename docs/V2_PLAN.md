@@ -61,11 +61,15 @@ the budget on the additive pieces a harsh judge actually grades. Full design: do
   (confusion matrix not in the model metadata file; not fabricated.)
 
 ### Phase 4 — Winning-plan correctness + UX (from the 17-agent review)
-- ☐ verify/remove 1GB tar + scratch dumps; branding; .env.example; rate-limit/day; OpenAI timeout +
-  AbortController; image downscale; eco offline fallback; startup self-check; honest labels;
-  remove rubric chips; auto-load research; Board→Home; 502 refusal card; a11y dialog; aria-live;
-  guidance dilution fix; fraud reason in panel; delete chatEcoAction; data-not-instructions clauses;
-  carbon formula line; role-specific landing.
+- ◐ Audited 2026-06-18. DONE this pass: gitignore the scratch dumps (3.9M txt + corpus json/html);
+  backend/.env.example; OpenAI per-request timeout + retries (covers every call); deleted the dead
+  chatEcoAction/simulateMockChat/CHAT_SYSTEM_PROMPT chain; removed the rubric-gaming chips from Coach.
+  CONFIRMED already done (grep-audited): AI rate-limit/day, eco offline mock fallback, honest labels,
+  auto-loaded research, Board->Home nav, GeoRise branding.
+  STILL TODO: client-side image downscale (server retention already downscales storage); startup
+  retrieval self-check; 502->visible refusal card; a11y dialog (role/aria-modal/focus-trap) + aria-live
+  on the quiz; data-not-instructions clauses audit; carbon-formula line in the Evidence Panel;
+  role-specific landing.
 
 ### Phase 5 — Scale honesty
 - ☐ real vector index (sqlite-vec/pgvector) OR explicitly document brute-force as a demo choice with

@@ -17,3 +17,6 @@ ECORISE_NEW_CODE.txt
 georise-current-source.MANIFEST.txt
 georise-current-source.tar.gz
 *.tar.gz
+GEORISE_COMPLETE_SOURCE*.txt
+research-corpus-*.json
+research-corpus-viewer.html
