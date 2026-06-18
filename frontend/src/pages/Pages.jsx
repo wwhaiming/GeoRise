@@ -286,7 +286,7 @@ export function Profile({ ctx }) {
   return (
     <div className="screen-in">
       <div style={{ padding: '20px 18px 6px', textAlign: 'center', position: 'relative' }}>
-        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} aria-label="Settings" onClick={() => ctx.showToast('Settings')}>
+        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} aria-label="Privacy & data" onClick={() => ctx.go('privacy')}>
           <Icon name="settings" size={20} />
         </button>
         <Avatar src={user.avatar} name={user.name} size={92} ring="var(--green)" glow style={{ margin: '0 auto 12px' }} />
@@ -323,6 +323,7 @@ export function Profile({ ctx }) {
       <div style={{ padding: '18px 16px 100px', display: 'grid', gap: 12 }}>
         <button className="btn btn-primary btn-block" onClick={() => ctx.go('leaderboard')}><Icon name="trophy" size={18} color="#fff" /> View leaderboard</button>
         <button className="btn btn-purple btn-block" onClick={() => ctx.go('organizer')}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Create a leaderboard</button>
+        <button className="btn btn-secondary btn-block" onClick={() => ctx.go('privacy')}><Icon name="check" size={18} /> Privacy &amp; data</button>
         <button className="btn btn-secondary btn-block" onClick={ctx.logout}>Log out</button>
       </div>
     </div>

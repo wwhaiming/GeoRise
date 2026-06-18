@@ -5,6 +5,7 @@ const { getDb } = require('../db');
 const { authMiddleware } = require('../middleware/auth');
 const { calcNextReset, resetIfDue } = require('../utils/seasons');
 const { body } = require('../utils/validate');
+const { recordConsent } = require('../utils/privacy');
 
 const router = express.Router();
 
@@ -40,6 +41,9 @@ router.post('/', authMiddleware, body('createLeaderboard'), (req, res) => {
       // Organizer is always a member (so they can view/manage). includeSelf only
       // governs whether they are ranked among competitors (role marks them).
       db.prepare("INSERT INTO leaderboard_members (leaderboard_id, user_id, role) VALUES (?, ?, 'organizer')").run(id, req.userId);
+      // The teacher who creates a board has consented to their own participation, so
+      // they can post immediately. Student members still need consent recorded.
+      recordConsent(db, { leaderboardId: id, userId: req.userId, tier: 'classroom', status: 'granted', attestedBy: req.userId, method: 'organizer (board creator)' });
     })();
     res.json({
       id,

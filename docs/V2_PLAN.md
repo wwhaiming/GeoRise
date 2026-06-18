@@ -19,23 +19,32 @@ truthful confidence label + assumptions. We build the rest to masterful quality.
   action-leverage + grounded recommendation gated by deterministicFaithfulness >= SIM_FLOOR). (1332251, verified live)
 - ☑ "action leverage" line in /school-insight, surfaced in the digest UI.
 - ☑ `components/SchoolFootprint.jsx` digest as the AI-tab hero + baseline wizard. (a0c7e66, verified live + screenshotted)
-- ☐ add a footprintModel unit test to backend/test (currently only ad-hoc sanity-checked).
+- ☑ add a footprintModel unit test to backend/test (1164aed, 8 hermetic cases).
 
 ### RESUME POINTER (for a fresh session)
-Branch `georise-v2-footprint-privacy`, pushed (a0c7e66). DONE: Phase 1 fully — footprint model +
-/school-footprint + /school-insight + SchoolFootprint digest hero (all verified live).
-NEXT = Phase 2 privacy. Start with the multi-tenant `school_id` migration FIRST in a fresh
-full-context session (touches db.js + every route; HIGH-RISK, never across a compaction), then the
-additive pieces: consent gate, image retention modes, teacher-review-before-feed, account export/delete,
-privacy-by-design screen, model/data card. Then council re-grade checkpoint CP1.
-Also still owed: footprintModel unit test.
+Branch `georise-v2-footprint-privacy`. DONE: Phase 1 (footprint intelligence + unit tests) AND
+Phase 2 (privacy/FERPA-COPPA, re-scoped to additive — see docs/PRIVACY.md). Backend 79/79 green,
+frontend builds clean. Commit + push of the Phase 2 work is PENDING (next mechanical step).
+NEXT = council re-grade checkpoint CP1 (re-run /claude-council:ask with Phase 1+2 implemented),
+then Phase 3 (evaluation rigor: real metrics, semantic entailment gate, in-app AI report card,
+model cards). Phases 4-6 (winning-plan UX fixes, scale honesty, submission artifacts) after.
 
 ### Phase 2 — Privacy / FERPA-COPPA for minors  (can DISQUALIFY; non-negotiable)
-- ☐ multi-tenant `school_id` isolation: schema migration + scoped authz on every query + audit log.
-- ☐ consent model (demo / classroom / parent-approved); block uploads until consent.
-- ☐ image retention modes (do_not_store / 24h / until_review); store derived labels not raw where possible.
-- ☐ teacher review before feed/leaderboard publication; appeal path for fraud false-positives.
-- ☐ account export + delete; privacy-by-design screen; model/data card.
+RE-SCOPED (2026-06-18): code review showed the leaderboard ALREADY is the tenant boundary
+(membership-gated everywhere; email never leaked). A parallel `school_id` on every table was
+rejected as redundant, high-risk churn. We hardened + tested the existing boundary and spent
+the budget on the additive pieces a harsh judge actually grades. Full design: docs/PRIVACY.md.
+- ☑ tenant isolation hardened + proven (cross-board denial test); `school_id` migration
+  intentionally NOT done (documented rationale, not an oversight).
+- ☑ consent model (demo / classroom / parent); uploads blocked until consent — enforced BEFORE
+  any AI call in posts + trashspotter; organizer auto-consented; student self-attest path.
+- ☑ image retention (minimize default / standard / 24h / do_not_store); jimp thumbnails; full
+  original never stored by default; 24h purge sweep on boot + 60s interval.
+- ☑ teacher review before feed/leaderboard publication; reject reverses points EXACTLY (clawback
+  by point_events.source_id). Review OFF by default; documented pending-window tradeoff.
+- ☑ account export + delete (cascade, clears session); privacy-by-design + model/data card; audit log.
+- ☑ backend tests: test/privacy.test.js (8 integration cases) — full suite 79/79 green.
+- ☑ frontend: PrivacyCenter screen + consent gate in upload modal + Profile entry; vite build green.
 
 ### Phase 3 — Evaluation rigor (real, not illustrative)
 - ☐ human-labeled eval set (>=30 cases) for retrieval + grounding; compute Recall@k, MRR,
@@ -66,3 +75,7 @@ Also still owed: footprintModel unit test.
 
 ### Grade log
 - Baseline (all-fixes-assumed): 85/100. Biggest blocker: validated school-level footprint intelligence.
+- Phase 1 shipped: footprint model + /school-insight digest + 8 unit tests (closes the #1 codeable gap).
+- Phase 2 shipped: privacy engine (consent gate, retention minimization, teacher review, export/delete,
+  audit log, model card) + 8 integration tests. Addresses the FERPA/COPPA "can-disqualify" gap. CP1
+  council re-grade not yet re-run.

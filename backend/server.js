@@ -9,6 +9,7 @@ const { getDb } = require('./db');
 const { csrfGuard } = require('./middleware/csrf');
 const { authLimiter } = require('./middleware/rateLimit');
 const { runDueResets } = require('./utils/seasons');
+const { purgeExpiredImages } = require('./utils/privacy');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -35,6 +36,11 @@ app.use(csrfGuard);
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false }));
 
 getDb();
+// Sweep any retention-expired images on boot (24h-mode photos that lapsed while down).
+try {
+  const purged = purgeExpiredImages(getDb());
+  if (purged.posts || purged.trash) console.log(`🧹 Purged expired images: ${purged.posts} posts, ${purged.trash} trash`);
+} catch (e) { console.error('startup purge error:', e.message); }
 console.log('✅ Database initialized');
 
 app.use('/api/auth', authLimiter, require('./routes/auth'));
@@ -44,6 +50,7 @@ app.use('/api/posts', require('./routes/posts'));
 app.use('/api/quests', require('./routes/quests'));
 app.use('/api/trash', require('./routes/trashspotter'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/privacy', require('./routes/privacy'));   // consent, retention policy, review, export/delete, model card
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -63,6 +70,7 @@ if (require.main === module) {
   });
   const interval = setInterval(() => {
     try { runDueResets(getDb()); } catch (e) { console.error('reset job error:', e.message); }
+    try { purgeExpiredImages(getDb()); } catch (e) { console.error('image purge error:', e.message); }
   }, 60 * 1000);
   interval.unref();
 }

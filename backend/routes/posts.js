@@ -12,6 +12,7 @@ const { evaluateAdversarial } = require('../utils/integrityGates');
 const { imageHash, perceptualHash, hammingDistance } = require('../utils/imageHash');
 const { body, pageParams } = require('../utils/validate');
 const analysisCache = require('../utils/analysisCache');
+const { boardPrivacy, consentSatisfied, applyRetention, auditLog } = require('../utils/privacy');
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -79,6 +80,14 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
     const lbId = v.leaderboardId || null;
     if (lbId && !db.prepare('SELECT 1 FROM leaderboard_members WHERE leaderboard_id = ? AND user_id = ?').get(lbId, req.userId)) {
       return res.status(403).json({ error: 'Join this leaderboard before posting to it' });
+    }
+    // FERPA/COPPA: a class board can require recorded consent before a (possibly
+    // minor) student uploads a photo. Fail fast — before any paid AI call.
+    if (lbId && !consentSatisfied(db, lbId, req.userId)) {
+      return res.status(403).json({
+        error: 'Consent is required before posting to this class. Ask your teacher to record consent.',
+        reason: 'needs_consent', accepted: false, points: 0,
+      });
     }
 
     const hash = imageHash(image);
@@ -170,11 +179,27 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
       : null;
     const isQuestCompletion = !!matchedQuest;
 
+    // Retention: store the least we can. By default we keep only a downscaled
+    // thumbnail (or nothing); the full-resolution photo of a student is discarded.
+    // The dedup hash/phash were already computed from the FULL image above, so
+    // anti-fraud is unaffected by what we choose to persist.
+    const priv = boardPrivacy(db, lbId);
+    const ret = await applyRetention(priv ? priv.retentionMode : 'minimize', image);
+    const derivedLabel = [aiResult.actionType, aiResult.specificAction].filter(Boolean).join(' — ').slice(0, 120);
+    const reviewRequired = priv ? priv.reviewRequired : false;
+
     const result = processEcoAction({
       userId: req.userId, leaderboardId: lbId, aiResult, miles, caption: v.caption,
-      image, imageHash: hash, phash, taggedUserIds, isQuestCompletion,
+      image: ret.storedImage, imageHash: hash, phash, taggedUserIds, isQuestCompletion,
       co2Saved: carbon.kgCO2e, integrityMultiplier: verdict.multiplier,
     });
+
+    // Stamp privacy state on the row. When the board requires teacher review the
+    // post is held as 'pending' (hidden from the feed until approved); points were
+    // computed but are reversed if the teacher rejects it (see routes/privacy.js).
+    db.prepare("UPDATE posts SET retention_mode = ?, image_expires_at = ?, derived_label = ?, status = ? WHERE id = ?")
+      .run(ret.retentionMode, ret.expiresAt, derivedLabel, reviewRequired ? 'pending' : 'published', result.postId);
+    auditLog(db, { actorUserId: req.userId, action: 'post.create', targetType: 'post', targetId: result.postId, leaderboardId: lbId, detail: { retentionMode: ret.retentionMode, reviewRequired } });
 
     let questUpdate = null;
     if (isQuestCompletion) {
@@ -193,6 +218,7 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
       breakdown: result.breakdown, bonuses: result.bonuses, multiplier: result.multiplier,
       explanation: result.explanation, co2Saved: result.co2Saved, carbon,
       aiResult, integrity, questUpdate, aiRemaining: req.aiRemaining,
+      status: reviewRequired ? 'pending' : 'published', pendingReview: reviewRequired,
     });
   } catch (err) {
     console.error('Create post error:', err);
@@ -215,7 +241,7 @@ router.get('/', authMiddleware, (req, res) => {
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ?) as liked
       FROM posts p JOIN users u ON u.id = p.user_id
-      WHERE p.hidden = 0`;
+      WHERE p.hidden = 0 AND p.status = 'published'`;
     // Unscoped feed must NOT leak private-board posts: only board-less posts,
     // plus boards the user is a member of or organizes.
     const posts = leaderboardId

@@ -254,6 +254,39 @@ function initTables() {
       opted_in INTEGER DEFAULT 0,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    -- Privacy / FERPA-COPPA (Phase 2, docs/PRIVACY.md). Consent is recorded per
+    -- (board, member): a school's data subjects are its leaderboard members, and
+    -- consent / retention policy live on the board (the tenant boundary).
+    CREATE TABLE IF NOT EXISTS consent_records (
+      id TEXT PRIMARY KEY,
+      leaderboard_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      tier TEXT NOT NULL,                  -- demo | classroom | parent
+      status TEXT NOT NULL DEFAULT 'none', -- none | attested | granted | revoked
+      attested_by TEXT,                    -- teacher/organizer who attested (classroom/parent)
+      method TEXT DEFAULT '',              -- how consent was obtained (free text)
+      note TEXT DEFAULT '',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE (leaderboard_id, user_id),
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    -- Tamper-evident privacy audit trail. Intentionally has NO foreign key on the
+    -- actor: the log must survive an account deletion (we retain who-did-what even
+    -- after the user row is gone), so actor_user_id is a free id, nullable.
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      actor_user_id TEXT,
+      action TEXT NOT NULL,
+      target_type TEXT DEFAULT '',
+      target_id TEXT DEFAULT '',
+      leaderboard_id TEXT,
+      detail TEXT DEFAULT '',              -- JSON
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 }
 
@@ -268,6 +301,21 @@ function migrate() {
     ['trash_reports', 'phash', 'TEXT'],
     ['quests', 'awarded', 'INTEGER DEFAULT 0'],
     ['notifications', 'link', "TEXT DEFAULT ''"],
+    // Privacy / FERPA-COPPA (Phase 2). Board-level policy + per-post privacy state.
+    // A board defaults to the privacy-forward posture (classroom consent required,
+    // minimal image retention); the demo board is opened explicitly by the seed.
+    ['leaderboards', 'consent_mode', "TEXT DEFAULT 'classroom'"],   // demo | classroom | parent
+    ['leaderboards', 'retention_mode', "TEXT DEFAULT 'minimize'"],  // minimize | standard | 24h | do_not_store
+    ['leaderboards', 'review_required', 'INTEGER DEFAULT 0'],       // teacher approves before feed/leaderboard
+    ['posts', 'status', "TEXT DEFAULT 'published'"],                // published | pending | rejected
+    ['posts', 'retention_mode', "TEXT DEFAULT 'standard'"],
+    ['posts', 'image_expires_at', 'TEXT'],
+    ['posts', 'derived_label', "TEXT DEFAULT ''"],                  // shown when the raw image is not retained
+    ['posts', 'reviewed_by', 'TEXT'],
+    ['posts', 'reviewed_at', 'TEXT'],
+    ['trash_reports', 'retention_mode', "TEXT DEFAULT 'standard'"],
+    ['trash_reports', 'image_expires_at', 'TEXT'],
+    ['trash_reports', 'derived_label', "TEXT DEFAULT ''"],
   ];
   for (const [table, col, type] of adds) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch (_) { /* exists */ }
@@ -296,6 +344,12 @@ function createIndexes() {
     CREATE INDEX IF NOT EXISTS idx_cquestions_topic ON coach_questions(topic, difficulty, approved);
     CREATE INDEX IF NOT EXISTS idx_canswers_user   ON coach_answers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_ctips_date      ON coach_daily_tips(user_id, deliver_date);
+    CREATE INDEX IF NOT EXISTS idx_posts_status    ON posts(leaderboard_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_expiry    ON posts(image_expires_at) WHERE image_expires_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_trash_expiry    ON trash_reports(image_expires_at) WHERE image_expires_at IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_consent_board   ON consent_records(leaderboard_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_board     ON audit_log(leaderboard_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_audit_actor     ON audit_log(actor_user_id, created_at);
   `);
 }
 

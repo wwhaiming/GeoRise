@@ -84,6 +84,17 @@ export const api = {
   // School hidden-footprint (Direction B)
   coachSchoolInsight: (leaderboardId) => apiFetch(`/api/coach/school-insight${leaderboardId ? `?leaderboardId=${encodeURIComponent(leaderboardId)}` : ''}`),
   coachSetFootprint: (body) => apiFetch('/api/coach/school-footprint', { method: 'POST', body: JSON.stringify(body) }),
+
+  // Privacy / FERPA-COPPA (Phase 2)
+  privacyPolicy: () => apiFetch('/api/privacy/policy'),
+  getConsent: (leaderboardId) => apiFetch(`/api/privacy/consent?leaderboardId=${encodeURIComponent(leaderboardId)}`),
+  setConsent: (body) => apiFetch('/api/privacy/consent', { method: 'POST', body: JSON.stringify(body) }),
+  setBoardPrivacy: (id, body) => apiFetch(`/api/privacy/boards/${id}/privacy`, { method: 'POST', body: JSON.stringify(body) }),
+  reviewQueue: (id) => apiFetch(`/api/privacy/boards/${id}/review-queue`),
+  reviewPost: (id, body) => apiFetch(`/api/privacy/posts/${id}/review`, { method: 'POST', body: JSON.stringify(body) }),
+  boardAudit: (leaderboardId) => apiFetch(`/api/privacy/audit?leaderboardId=${encodeURIComponent(leaderboardId)}`),
+  exportData: () => apiFetch('/api/privacy/export'),
+  deleteAccount: () => apiFetch('/api/privacy/account/delete', { method: 'POST', body: JSON.stringify({ confirm: true }) }),
 };
 
 export default api;

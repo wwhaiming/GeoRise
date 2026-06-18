@@ -61,6 +61,24 @@ const schemas = {
     quietEnd: z.coerce.number().int().min(0).max(23).optional(),
     optedIn: z.boolean().optional(),
   }),
+  // Privacy / FERPA-COPPA (Phase 2)
+  setBoardPrivacy: z.object({
+    consentMode: z.enum(['demo', 'classroom', 'parent']).optional(),
+    retentionMode: z.enum(['minimize', 'standard', '24h', 'do_not_store']).optional(),
+    reviewRequired: z.boolean().optional(),
+  }),
+  recordConsent: z.object({
+    leaderboardId: z.string().uuid(),
+    userId: z.string().uuid().optional(),               // a teacher attesting/granting for a student
+    status: z.enum(['attested', 'granted', 'revoked']),
+    method: z.string().trim().max(200).optional(),
+    note: z.string().trim().max(500).optional(),
+  }),
+  reviewPost: z.object({
+    decision: z.enum(['approve', 'reject']),
+    reason: z.string().trim().max(300).optional(),
+  }),
+  deleteAccount: z.object({ confirm: z.literal(true) }),
 };
 
 // Express middleware factory for body validation.

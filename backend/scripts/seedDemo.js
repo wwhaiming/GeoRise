@@ -73,8 +73,11 @@ function seed() {
 
     // Board owned by the demo user.
     const boardId = uuid();
-    db.prepare(`INSERT INTO leaderboards (id, name, reset_interval, prize, include_self, invite_code, organizer_id, next_reset)
-      VALUES (?, ?, 'weekly', ?, 1, ?, ?, ?)`)
+    // consent_mode='demo' opens the board for judging: the demo path has no real
+    // student PII, so the consent gate (default 'classroom') is intentionally relaxed
+    // here. A real class board defaults to requiring recorded consent.
+    db.prepare(`INSERT INTO leaderboards (id, name, reset_interval, prize, include_self, invite_code, organizer_id, next_reset, consent_mode)
+      VALUES (?, ?, 'weekly', ?, 1, ?, ?, ?, 'demo')`)
       .run(boardId, 'Greenfield High', '$250 campus store + a tree planted', INVITE, demo.id, calcNextReset('weekly'));
 
     // Demo user as an organizer-member with their own standing.

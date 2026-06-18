@@ -10,6 +10,7 @@ const { awardPoints } = require('../utils/pointsEngine');
 const { evaluateAdversarial } = require('../utils/integrityGates');
 const { imageHash, perceptualHash, hammingDistance } = require('../utils/imageHash');
 const { body } = require('../utils/validate');
+const { boardPrivacy, consentSatisfied, applyRetention, auditLog } = require('../utils/privacy');
 
 const router = express.Router();
 
@@ -28,6 +29,13 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
 
     if (leaderboardId && !db.prepare('SELECT 1 FROM leaderboard_members WHERE leaderboard_id = ? AND user_id = ?').get(leaderboardId, req.userId)) {
       return res.status(403).json({ error: 'Join this leaderboard before reporting to it' });
+    }
+    // FERPA/COPPA consent gate, same as the eco-action route — fail fast before AI.
+    if (leaderboardId && !consentSatisfied(db, leaderboardId, req.userId)) {
+      return res.status(403).json({
+        error: 'Consent is required before reporting to this class. Ask your teacher to record consent.',
+        reason: 'needs_consent', accepted: false, points: 0,
+      });
     }
 
     const hash = imageHash(image);
@@ -89,6 +97,11 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
     const points = Math.round(basePoints * verdict.multiplier);
     const id = uuid();
     const postId = uuid();
+    // Retention: persist only a thumbnail (or nothing) per the board's policy. The
+    // dedup hash/phash were taken from the full image above, so fraud screens hold.
+    const priv = boardPrivacy(db, leaderboardId);
+    const ret = await applyRetention(priv ? priv.retentionMode : 'minimize', image);
+    const derivedLabel = `Trash report — severity ${severity.score}/10`;
     // The dup check above runs BEFORE the awaited AI call, so two concurrent reports
     // of the same photo can both pass it. Re-check inside the (synchronous, serialized)
     // transaction: the second one now sees the first's row and aborts, preventing
@@ -96,18 +109,19 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
     const result = db.transaction(() => {
       const dupNow = db.prepare("SELECT id FROM trash_reports WHERE user_id = ? AND image_hash = ? AND created_at > datetime('now','-1 day')").get(req.userId, hash);
       if (dupNow) return { duplicate: true };
-      db.prepare(`INSERT INTO trash_reports (id, user_id, leaderboard_id, image, image_hash, phash, severity, description, estimated_items, location, points)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(id, req.userId, leaderboardId || null, image, hash, phash || null, severity.score, severity.description, severity.estimatedItems || '', location || '', points);
-      db.prepare(`INSERT INTO posts (id, user_id, leaderboard_id, image, image_hash, phash, action_type, action_desc, co2_saved, points, caption)
-        VALUES (?, ?, ?, ?, ?, ?, 'nature', 'Trash report', 0.5, ?, ?)`)
-        .run(postId, req.userId, leaderboardId || null, image, hash, phash || null, points, `Trash spotted${location ? ' at ' + location : ''} — severity ${severity.score}/10`);
+      db.prepare(`INSERT INTO trash_reports (id, user_id, leaderboard_id, image, image_hash, phash, severity, description, estimated_items, location, points, retention_mode, image_expires_at, derived_label)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, req.userId, leaderboardId || null, ret.storedImage, hash, phash || null, severity.score, severity.description, severity.estimatedItems || '', location || '', points, ret.retentionMode, ret.expiresAt, derivedLabel);
+      db.prepare(`INSERT INTO posts (id, user_id, leaderboard_id, image, image_hash, phash, action_type, action_desc, co2_saved, points, caption, retention_mode, image_expires_at, derived_label)
+        VALUES (?, ?, ?, ?, ?, ?, 'nature', 'Trash report', 0.5, ?, ?, ?, ?, ?)`)
+        .run(postId, req.userId, leaderboardId || null, ret.storedImage, hash, phash || null, points, `Trash spotted${location ? ' at ' + location : ''} — severity ${severity.score}/10`, ret.retentionMode, ret.expiresAt, derivedLabel);
       awardPoints(req.userId, leaderboardId, points, { source: 'trash', sourceId: id });
       return { duplicate: false };
     })();
     if (result.duplicate) {
       return res.status(409).json({ error: 'You already reported this photo recently.', reason: 'duplicate', accepted: false, points: 0 });
     }
+    auditLog(db, { actorUserId: req.userId, action: 'trash.create', targetType: 'trash_report', targetId: id, leaderboardId: leaderboardId || null, detail: { retentionMode: ret.retentionMode, severity: severity.score } });
 
     res.json({
       success: true, accepted: true, reportId: id, postId,

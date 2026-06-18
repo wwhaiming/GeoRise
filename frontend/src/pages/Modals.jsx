@@ -32,11 +32,17 @@ export function LogAction({ ctx }) {
           ctx.onActionComplete(data, base64);
         }
       } catch (err) {
+        if (err?.data?.reason === 'needs_consent') { setPhase('consent'); return; }
         ctx.showToast(err?.status === 409 ? 'You already logged this photo recently.' : (err.message || 'Could not analyze the photo.'));
         ctx.closeModal();
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const recordConsent = async () => {
+    try { await api.setConsent({ leaderboardId: ctx.leaderboardId, status: 'attested' }); ctx.showToast('Consent recorded — add your photo'); setPhase('capture'); }
+    catch (e) { ctx.showToast(e?.data?.error || e.message || 'Could not record consent. Ask your teacher.'); }
   };
 
   const confirm = async () => {
@@ -69,6 +75,21 @@ export function LogAction({ ctx }) {
           {phase === 'capture' && (
             <div className="muted" style={{ textAlign: 'center', fontSize: 13.5, fontWeight: 600 }}>
               Our AI detects the action, estimates CO₂ saved, and awards points automatically.
+            </div>
+          )}
+
+          {phase === 'consent' && (
+            <div className="card" style={{ padding: 16 }}>
+              <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 8 }}>Consent needed</div>
+              <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.45 }}>
+                This class records consent before a student uploads a photo (FERPA/COPPA). If you have permission, record it now to continue.
+              </div>
+              <button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={recordConsent}>
+                I have permission — record consent
+              </button>
+              <div className="dim" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 8 }}>
+                Parent-approved classes require your teacher to record it. See Privacy &amp; data.
+              </div>
             </div>
           )}
 
