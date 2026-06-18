@@ -7,6 +7,7 @@
  *
  * Renders for both eco actions and trash reports, accepted or rejected.
  */
+import { useEffect, useRef } from 'react';
 import Icon from './Icon';
 
 const CHECK_LABELS = {
@@ -112,6 +113,14 @@ function ToolCalls({ tools, accent }) {
 }
 
 export default function AIEvidence({ data, onClose }) {
+  const panelRef = useRef(null);
+  // Accessible modal: Escape closes, focus moves into the dialog on open.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    panelRef.current?.focus();
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   if (!data) return null;
   const accepted = !!data.accepted;
   const isTrash = data.kind === 'trash';
@@ -137,10 +146,12 @@ export default function AIEvidence({ data, onClose }) {
 
   return (
     <>
-      <div className="scrim" onClick={onClose} style={{ zIndex: 60 }} />
-      <div style={{
+      <div className="scrim" onClick={onClose} style={{ zIndex: 60 }} aria-hidden="true" />
+      <div ref={panelRef} role="dialog" aria-modal="true" tabIndex={-1}
+        aria-label={accepted ? 'AI verdict: verified and scored' : 'AI verdict: not verified'}
+        style={{
         position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', zIndex: 70,
-        width: 'min(92vw, 420px)', maxHeight: '88vh', overflowY: 'auto',
+        width: 'min(92vw, 420px)', maxHeight: '88vh', overflowY: 'auto', outline: 'none',
         background: 'linear-gradient(180deg,var(--navy-800),var(--navy-900))', borderRadius: 26,
         border: `1px solid ${accent}33`, boxShadow: '0 24px 70px rgba(30,91,57,.24)',
       }}>

@@ -192,6 +192,7 @@ export default function Coach({ ctx }) {
   const [result, setResult] = useState(null);
   const [noCorpus, setNoCorpus] = useState(false);
   const [guidance, setGuidance] = useState(null);
+  const [guidanceError, setGuidanceError] = useState(false);
   const [tip, setTip] = useState(null);
   const shownAt = useRef(0);
 
@@ -213,7 +214,7 @@ export default function Coach({ ctx }) {
         if (!alive) return;
         setEnabled(true);
         loadQuestion();
-        api.coachGuidance().then(r => alive && setGuidance(r.guidance)).catch(() => { /* optional coach card */ });
+        api.coachGuidance().then(r => alive && setGuidance(r.guidance)).catch((e) => { if (alive && (e?.status === 502 || e?.status === 503)) setGuidanceError(true); });
         api.coachTip().then(r => alive && setTip(r.tip)).catch(() => { /* optional coach card */ });
       })
       .catch(() => { if (alive) setEnabled(false); });
@@ -311,7 +312,7 @@ export default function Coach({ ctx }) {
                 {!result && <Sources sources={q.sources} />}
 
                 {result && (
-                  <div style={{ marginTop: 14 }}>
+                  <div style={{ marginTop: 14 }} role="status" aria-live="polite">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                       <span style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: result.correct ? 'var(--green)' : 'var(--coral)' }}>
                         {result.correct ? 'Correct' : 'Not quite'}
@@ -345,6 +346,18 @@ export default function Coach({ ctx }) {
                 <button className="btn btn-secondary btn-block btn-sm" style={{ marginTop: 12 }} onClick={openLog}>
                   <Icon name="camera" size={16} /> {guidance.action || 'Log a verified action'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* refusal card: the coach declines rather than guess (responsible-AI made visible) */}
+          {!guidance && guidanceError && (
+            <div style={{ padding: '16px 16px 0' }}>
+              <div className="card" style={{ padding: 14, border: '1px solid rgba(182,111,77,.22)' }}>
+                <div className="eyebrow" style={{ color: 'var(--coral-d)', marginBottom: 4 }}>Guidance withheld</div>
+                <div className="muted" style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
+                  The coach declined to generate a recommendation it couldn&rsquo;t ground in approved sources (or the model was unreachable). It refuses rather than guess.
+                </div>
               </div>
             </div>
           )}

@@ -43,6 +43,20 @@ try {
 } catch (e) { console.error('startup purge error:', e.message); }
 console.log('✅ Database initialized');
 
+// Startup self-check: when the coach is enabled, confirm its corpus is actually
+// retrievable so a misconfigured deploy fails loudly at boot, not silently per request.
+if (process.env.COACH_ENABLED === 'true' && process.env.NODE_ENV !== 'test') {
+  (async () => {
+    try {
+      const { retrieve } = require('./utils/coachRetrieval');
+      const hits = await retrieve(getDb(), 'plastic bottle waste', { k: 3 });
+      console.log(hits.length
+        ? `✅ Coach retrieval self-check: ${hits.length} chunks for a probe query`
+        : '⚠️  COACH_ENABLED but retrieval returned 0 chunks — run: npm run seed:coach');
+    } catch (e) { console.error('coach self-check error:', e.message); }
+  })();
+}
+
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/coach', require('./routes/coach'));   // gated behind COACH_ENABLED (see docs/AI_ECO_COACH_PLAN.md)
 app.use('/api/leaderboards', require('./routes/leaderboard'));

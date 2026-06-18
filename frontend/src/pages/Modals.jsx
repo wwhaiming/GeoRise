@@ -3,6 +3,7 @@ import { useState } from 'react';
 import Icon from '../components/Icon';
 import { Sheet, UploadFrame, PhotoSources } from '../components/Shared';
 import api from '../utils/api';
+import { downscaleImage } from '../utils/image';
 
 /* ---------- LOG ECO ACTION ---------- */
 export function LogAction({ ctx }) {
@@ -18,7 +19,7 @@ export function LogAction({ ctx }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = reader.result;
+      const base64 = await downscaleImage(reader.result);
       setImageData(base64);
       setPhase('analyzing');
       // Single server call analyzes + scores + (unless follow-up needed) creates the post.
@@ -156,8 +157,8 @@ export function TrashSpotter({ ctx }) {
   const processFile = (file) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      setImageData(reader.result);
+    reader.onload = async () => {
+      setImageData(await downscaleImage(reader.result));
       setPhase('result'); // severity is scored server-side on submit; no fabricated preview
     };
     reader.readAsDataURL(file);

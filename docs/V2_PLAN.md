@@ -66,10 +66,12 @@ the budget on the additive pieces a harsh judge actually grades. Full design: do
   chatEcoAction/simulateMockChat/CHAT_SYSTEM_PROMPT chain; removed the rubric-gaming chips from Coach.
   CONFIRMED already done (grep-audited): AI rate-limit/day, eco offline mock fallback, honest labels,
   auto-loaded research, Board->Home nav, GeoRise branding.
-  STILL TODO: client-side image downscale (server retention already downscales storage); startup
-  retrieval self-check; 502->visible refusal card; a11y dialog (role/aria-modal/focus-trap) + aria-live
-  on the quiz; data-not-instructions clauses audit; carbon-formula line in the Evidence Panel;
-  role-specific landing.
+  DONE 2nd pass (2026-06-18): client-side image downscale (utils/image.js, used in both upload paths);
+  startup retrieval self-check (server.js, skipped under test); 502/503 -> visible "guidance withheld"
+  refusal card; a11y on the Evidence Panel (role=dialog / aria-modal / Escape / focus-on-open) + aria-live
+  on the quiz result; carbon-formula line was ALREADY rendered (AIEvidence CarbonCard). Role-specific
+  landing: kept Coach as the universal entry (footprint hero + teacher controls via Privacy Center) — a
+  design decision, not a divergent landing. Phase 4 considered COMPLETE.
 
 ### Phase 5 — Scale honesty
 - ☐ real vector index (sqlite-vec/pgvector) OR explicitly document brute-force as a demo choice with
