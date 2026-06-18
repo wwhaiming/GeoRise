@@ -129,12 +129,13 @@ router.post('/boards/:id/privacy', authMiddleware, body('setBoardPrivacy'), (req
     const board = db.prepare('SELECT * FROM leaderboards WHERE id = ?').get(req.params.id);
     if (!board) return res.status(404).json({ error: 'Leaderboard not found' });
     if (board.organizer_id !== req.userId) return res.status(403).json({ error: 'Only the organizer can set privacy policy' });
-    const { consentMode, retentionMode, reviewRequired } = req.valid;
-    db.prepare('UPDATE leaderboards SET consent_mode = ?, retention_mode = ?, review_required = ? WHERE id = ?').run(
+    const { consentMode, retentionMode, reviewRequired, displayMode } = req.valid;
+    db.prepare('UPDATE leaderboards SET consent_mode = ?, retention_mode = ?, review_required = ?, display_mode = ? WHERE id = ?').run(
       consentMode || board.consent_mode, retentionMode || board.retention_mode,
-      reviewRequired === undefined ? board.review_required : (reviewRequired ? 1 : 0), req.params.id,
+      reviewRequired === undefined ? board.review_required : (reviewRequired ? 1 : 0),
+      displayMode || board.display_mode || 'names', req.params.id,
     );
-    P.auditLog(db, { actorUserId: req.userId, action: 'board.privacy_set', targetType: 'leaderboard', targetId: req.params.id, leaderboardId: req.params.id, detail: { consentMode, retentionMode, reviewRequired } });
+    P.auditLog(db, { actorUserId: req.userId, action: 'board.privacy_set', targetType: 'leaderboard', targetId: req.params.id, leaderboardId: req.params.id, detail: { consentMode, retentionMode, reviewRequired, displayMode } });
     res.json({ success: true, board: P.boardPrivacy(db, req.params.id) });
   } catch (err) {
     console.error('Set board privacy error:', err);

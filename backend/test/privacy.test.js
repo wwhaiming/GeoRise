@@ -162,6 +162,21 @@ test('data-subject rights: export returns everything, delete cascades and ends t
   assert.equal(me.status, 404, 'session no longer resolves to a user');
 });
 
+test('pseudonymous board masks other members to initials; you still see yourself', async () => {
+  const teacher = await newUser('Teach'); const s1 = await newUser('Maya Chen');
+  const board = await makeBoard(teacher, 'Pseudo');
+  await joinBoard(s1, board);
+  const set = await setPrivacy(teacher, board, { displayMode: 'initials' });
+  assert.equal(set.status, 200);
+  const view = await request(app).get(`/api/leaderboards/${board.id}`).set(...auth(s1.token));
+  assert.equal(view.status, 200);
+  const me = view.body.members.find(m => m.isYou);
+  const other = view.body.members.find(m => !m.isYou);
+  assert.equal(me.name, 'Maya Chen', 'you see your own real name');
+  assert.ok(/^[A-Z]\.([A-Z]\.)?$/.test(other.name), `other should be masked to initials, got "${other.name}"`);
+  assert.equal(other.handle, '', 'other member handle hidden when pseudonymous');
+});
+
 test('public model/data card is served', async () => {
   const r = await request(app).get('/api/privacy/policy');
   assert.equal(r.status, 200);

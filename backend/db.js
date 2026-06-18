@@ -307,6 +307,7 @@ function migrate() {
     ['leaderboards', 'consent_mode', "TEXT DEFAULT 'classroom'"],   // demo | classroom | parent
     ['leaderboards', 'retention_mode', "TEXT DEFAULT 'minimize'"],  // minimize | standard | 24h | do_not_store
     ['leaderboards', 'review_required', 'INTEGER DEFAULT 0'],       // teacher approves before feed/leaderboard
+    ['leaderboards', 'display_mode', "TEXT DEFAULT 'names'"],        // names | initials (pseudonymous ranking for minors)
     ['posts', 'status', "TEXT DEFAULT 'published'"],                // published | pending | rejected
     ['posts', 'retention_mode', "TEXT DEFAULT 'standard'"],
     ['posts', 'image_expires_at', 'TEXT'],

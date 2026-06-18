@@ -13,6 +13,7 @@ import api from '../utils/api';
 
 const CONSENT_LABEL = { demo: 'Demo (open)', classroom: 'Classroom (teacher attests)', parent: 'Parent-approved (strict)' };
 const RETENTION_LABEL = { minimize: 'Minimize (thumbnail only)', standard: 'Standard (full image)', '24h': 'Auto-delete after 24h', do_not_store: 'Do not store (label only)' };
+const DISPLAY_LABEL = { names: 'Show member names', initials: 'Initials only (pseudonymous)' };
 
 function Section({ icon, title, children, tint = 'var(--green)' }) {
   return (
@@ -33,7 +34,7 @@ export default function PrivacyCenter({ ctx }) {
   const [policy, setPolicy] = useState(null);
   const [consent, setConsent] = useState(null);   // { board, consent, satisfied }
   const [queue, setQueue] = useState([]);
-  const [board, setBoard] = useState({ consentMode: leaderboard?.consent_mode || 'classroom', retentionMode: leaderboard?.retention_mode || 'minimize', reviewRequired: !!leaderboard?.review_required });
+  const [board, setBoard] = useState({ consentMode: leaderboard?.consent_mode || 'classroom', retentionMode: leaderboard?.retention_mode || 'minimize', reviewRequired: !!leaderboard?.review_required, displayMode: leaderboard?.display_mode || 'names' });
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -137,6 +138,8 @@ export default function PrivacyCenter({ ctx }) {
             <button className="btn btn-secondary btn-sm btn-block" style={{ marginTop: 12 }} onClick={() => saveBoard({ reviewRequired: !board.reviewRequired })}>
               <Icon name={board.reviewRequired ? 'check' : 'x'} size={15} /> Review before publish: {board.reviewRequired ? 'ON' : 'OFF'}
             </button>
+            <label className="dim" style={{ fontSize: 11.5, fontWeight: 800, display: 'block', marginTop: 12 }}>Leaderboard display</label>
+            <Select value={board.displayMode} onChange={v => saveBoard({ displayMode: v })} options={DISPLAY_LABEL} />
           </Section>
         )}
 

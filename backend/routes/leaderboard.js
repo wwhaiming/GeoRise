@@ -26,6 +26,12 @@ function isMemberOrOrganizer(db, board, userId) {
   if (board.organizer_id === userId) return true;
   return !!db.prepare('SELECT 1 FROM leaderboard_members WHERE leaderboard_id = ? AND user_id = ?').get(board.id, userId);
 }
+// Pseudonymous ranking for minors: "Maya Chen" -> "M.C." (you still see your own name).
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Anon';
+  return parts.slice(0, 2).map(p => p[0].toUpperCase()).join('.') + '.';
+}
 
 router.post('/', authMiddleware, body('createLeaderboard'), (req, res) => {
   try {
@@ -101,7 +107,14 @@ router.get('/:id', authMiddleware, (req, res) => {
     // include_self governs whether the organizer is ranked among competitors. When
     // off, drop the organizer row before ranking so ranks stay contiguous.
     const members = board.include_self ? allMembers : allMembers.filter(m => m.role !== 'organizer');
-    const ranked = members.map((m, i) => ({ ...m, rank: i + 1, isYou: m.user_id === req.userId }));
+    const masked = board.display_mode === 'initials';
+    const ranked = members.map((m, i) => ({
+      ...m,
+      name: (masked && m.user_id !== req.userId) ? initials(m.name) : m.name,
+      handle: (masked && m.user_id !== req.userId) ? '' : m.handle,
+      rank: i + 1,
+      isYou: m.user_id === req.userId,
+    }));
     res.json({ leaderboard: board, members: ranked });
   } catch (err) {
     console.error('Get leaderboard error:', err);

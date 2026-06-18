@@ -66,6 +66,7 @@ const schemas = {
     consentMode: z.enum(['demo', 'classroom', 'parent']).optional(),
     retentionMode: z.enum(['minimize', 'standard', '24h', 'do_not_store']).optional(),
     reviewRequired: z.boolean().optional(),
+    displayMode: z.enum(['names', 'initials']).optional(),
   }),
   recordConsent: z.object({
     leaderboardId: z.string().uuid(),

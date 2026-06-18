@@ -30,12 +30,13 @@ function sqlDateTimePlus(ms) {
 // ── Consent ────────────────────────────────────────────────────────────────
 function boardPrivacy(db, leaderboardId) {
   if (!leaderboardId) return null; // board-less (personal) posts have no school context
-  const b = db.prepare('SELECT consent_mode, retention_mode, review_required FROM leaderboards WHERE id = ?').get(leaderboardId);
+  const b = db.prepare('SELECT consent_mode, retention_mode, review_required, display_mode FROM leaderboards WHERE id = ?').get(leaderboardId);
   if (!b) return null;
   return {
     consentMode: CONSENT_MODES.includes(b.consent_mode) ? b.consent_mode : 'classroom',
     retentionMode: RETENTION_MODES.includes(b.retention_mode) ? b.retention_mode : 'minimize',
     reviewRequired: !!b.review_required,
+    displayMode: ['names', 'initials'].includes(b.display_mode) ? b.display_mode : 'names',
   };
 }
 
