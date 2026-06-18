@@ -108,5 +108,27 @@ function formatReport(m) {
   return lines.join('\n');
 }
 
-module.exports = { computeMetrics, formatReport };
+/**
+ * Retrieval quality on a human-labeled set. Each case carries the 1-based ranks (in
+ * the returned top-k) at which a RELEVANT source appeared.
+ *   - recallAtK:   fraction of queries with >=1 relevant doc in the top-k
+ *   - mrr:         mean reciprocal rank of the first relevant doc (0 if none in top-k)
+ *   - precisionAtK: mean fraction of the top-k that were relevant
+ * @param {Array<{relevantRanks:number[]}>} cases
+ */
+function retrievalMetrics(cases, k = 5) {
+  const rows = Array.isArray(cases) ? cases : [];
+  const n = rows.length;
+  if (!n) return { n: 0, k, recallAtK: 0, mrr: 0, precisionAtK: 0 };
+  let recallHits = 0, rrSum = 0, precSum = 0;
+  for (const c of rows) {
+    const ranks = (c.relevantRanks || []).filter(r => Number.isFinite(r) && r >= 1 && r <= k);
+    if (ranks.length) { recallHits++; rrSum += 1 / Math.min(...ranks); }
+    precSum += ranks.length / k;
+  }
+  const r3 = (x) => Math.round(x * 1000) / 1000;
+  return { n, k, recallAtK: r3(recallHits / n), mrr: r3(rrSum / n), precisionAtK: r3(precSum / n) };
+}
+
+module.exports = { computeMetrics, formatReport, retrievalMetrics };
 

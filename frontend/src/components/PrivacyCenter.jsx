@@ -186,6 +186,7 @@ export default function PrivacyCenter({ ctx }) {
                 <div key={i} style={{ padding: 10, borderRadius: 11, background: 'var(--navy-800)', border: '1px solid rgba(45,91,57,.10)' }}>
                   <div style={{ fontWeight: 800, fontSize: 12.5 }}>{m.name}</div>
                   <div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{m.use}</div>
+                  {m.metrics && <div style={{ fontSize: 11, fontWeight: 700, marginTop: 2, color: 'var(--green-d)' }}>Metrics: {m.metrics}</div>}
                   <div className="dim" style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>Limits: {m.limits}</div>
                 </div>
               ))}

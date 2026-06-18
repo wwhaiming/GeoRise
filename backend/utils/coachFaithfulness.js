@@ -23,6 +23,19 @@ function coverage(claim, evidence) {
   return hit / c.size;
 }
 
+// Numeric / percentage figures asserted by the answer that do NOT appear in the cited
+// evidence. A deterministic claim-verification layer ALONGSIDE the lexical coverage
+// gate: token-overlap can pass an answer that invented a number ("cuts emissions 80%")
+// while reusing supported words. This catches that fabricated-figure class. It is a
+// heuristic entailment PROXY, not a learned NLI model — labeled honestly as such.
+function numericClaims(s) {
+  return (String(s || '').match(/\d+(?:\.\d+)?\s?%?/g) || []).map(x => x.replace(/\s/g, ''));
+}
+function unsupportedNumbers(claim, evidence) {
+  const ev = String(evidence || '').replace(/\s/g, '');
+  return numericClaims(claim).filter(num => !ev.includes(num));
+}
+
 function validateCitations(sourceIds, retrievedIds) {
   if (!Array.isArray(sourceIds) || sourceIds.length === 0) return false;
   const set = new Set(retrievedIds);
@@ -45,8 +58,14 @@ function gate(q, retrievedChunks, { simFloor = SIM_FLOOR } = {}) {
   }
   const f = deterministicFaithfulness(q, retrievedChunks);
   if (f < simFloor) return { ok: false, reason: 'unsupported', faithfulness: f };
+  // Claim-verification layer (entailment proxy): reject answers asserting a numeric
+  // figure absent from the cited evidence, even if lexical coverage passed.
+  const cited = retrievedChunks.filter(c => Array.isArray(q.sourceIds) && q.sourceIds.includes(c.id));
+  const evidence = cited.map(c => c.text).join(' ');
+  const unsupported = unsupportedNumbers(`${q.correct || ''} ${q.explanation || ''}`, evidence);
+  if (unsupported.length) return { ok: false, reason: 'unsupported_number', faithfulness: f, unsupportedNumbers: unsupported };
   return { ok: true, reason: 'ok', faithfulness: f };
 }
 
-module.exports = { gate, deterministicFaithfulness, validateCitations, coverage, SIM_FLOOR };
+module.exports = { gate, deterministicFaithfulness, validateCitations, coverage, unsupportedNumbers, numericClaims, SIM_FLOOR };
 

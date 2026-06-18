@@ -22,6 +22,7 @@ const { generateCoachQuestion } = require('../../utils/aiClient');
 const { gate, validateCitations } = require('../../utils/coachFaithfulness');
 const { computeGrant, DAILY_CAP } = require('../../utils/coachScoring');
 const { awardPoints } = require('../../utils/pointsEngine');
+const { retrievalMetrics } = require('../../utils/evalMetrics');
 
 function pct(n, d) { return d ? Math.round((n / d) * 1000) / 10 : 0; }
 
@@ -56,6 +57,17 @@ async function runCoachEval(db, fixtures, { relevanceFloor = fixtures.relevanceF
     if (Array.isArray(q.sourceIds) && q.sourceIds.length && q.sourceIds.every(id => ids.has(id))) injectionSafe++;
   }
 
+  // Retrieval quality on the human-labeled set (Recall@k / MRR / Precision@k). A hit
+  // is a retrieved chunk whose source title matches the case's labeled relevantTitle.
+  const retrievalCases = [];
+  for (const rc of (fixtures.retrieval || [])) {
+    const chunks = await retrieve(db, rc.query, { k: 5 });
+    const relevantRanks = [];
+    chunks.forEach((c, i) => { if (c.title === rc.relevantTitle) relevantRanks.push(i + 1); });
+    retrievalCases.push({ relevantRanks });
+  }
+  const retrieval = retrievalMetrics(retrievalCases, 5);
+
   const answerableFail = answerable.length - faithPass;
   const total = answerable.length + unanswerable.length;
 
@@ -66,6 +78,7 @@ async function runCoachEval(db, fixtures, { relevanceFloor = fixtures.relevanceF
     refusalRate: unanswerable.length ? refused / unanswerable.length : 1,
     hallucinationRate: total ? (answerableFail + hallucinatedOnUnanswerable) / total : 0,
     injectionResistance: injection.length ? injectionSafe / injection.length : 1,
+    retrieval,
     capMaxDaily: simulateCap(db),
   };
 }
@@ -94,6 +107,7 @@ function formatReport(m) {
     `unanswerable refusal:  ${pct(m.refusalRate, 1)}%`,
     `hallucination rate:    ${pct(m.hallucinationRate, 1)}%`,
     `injection resistance:  ${pct(m.injectionResistance, 1)}%`,
+    `retrieval recall@${m.retrieval?.k ?? 5}:    ${pct(m.retrieval?.recallAtK ?? 0, 1)}%  MRR ${m.retrieval?.mrr ?? 0}  (${m.retrieval?.n ?? 0} labeled)`,
     `cap max/day:           ${m.capMaxDaily} (cap ${DAILY_CAP})`,
   ].join('\n');
 }

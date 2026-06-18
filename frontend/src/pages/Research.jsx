@@ -25,6 +25,10 @@ function AIReportCard() {
     ['Injection resistance', pctv(m.injectionResistance)],
     ['Point cap holds', `${m.capMaxDaily}/day`],
   ];
+  if (m.retrieval) {
+    rows.push([`Retrieval recall@${m.retrieval.k}`, pctv(m.retrieval.recallAtK)]);
+    rows.push(['Retrieval MRR', String(m.retrieval.mrr ?? 0)]);
+  }
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div className="card" style={{ padding: 15 }}>

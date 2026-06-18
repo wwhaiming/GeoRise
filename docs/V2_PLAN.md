@@ -47,14 +47,18 @@ the budget on the additive pieces a harsh judge actually grades. Full design: do
 - ☑ frontend: PrivacyCenter screen + consent gate in upload modal + Profile entry; vite build green.
 
 ### Phase 3 — Evaluation rigor (real, not illustrative)
-- ☐ human-labeled eval set (>=30 cases) for retrieval + grounding; compute Recall@k, MRR,
-  citation precision, refusal precision, fraud false-positive rate.
-- ☐ semantic entailment grounding gate (atomic-claim → entailment judge) ALONGSIDE lexical gate;
-  label honestly as added layer.
+- ◐ human-labeled eval set + Recall@k/MRR/Precision@k computed (evalMetrics.retrievalMetrics,
+  surfaced in the report card). HONEST GAP: only 4 labeled retrieval cases on the curated coach
+  corpus (+9 coach prompts), NOT yet >=30; refusal precision + fraud FPR still TODO.
+- ☑ semantic entailment grounding gate — deterministic numeric claim-verification layer added
+  ALONGSIDE the lexical coverage gate (rejects fabricated figures). Honest: heuristic proxy, not a
+  learned NLI; an LLM entailment judge remains a future upgrade.
 - ☑ in-app "AI report card" reads REAL eval output, not hardcoded numbers — GET
   /api/coach/eval-report serves results.json (written by `npm run test:coach-eval`),
   surfaced in the Research tab. (80/80 suite, +1 endpoint test.)
-- ☐ model cards: CNN (dataset/accuracy/confusion/limits) + OpenAI vision usage.
+- ☑ model cards: litter CNN (real val_acc 0.936 + dataset 3527 imgs from model/trash_detector.json)
+  + OpenAI vision/embeddings usage + limits — served at /api/privacy/policy, rendered in Privacy Center.
+  (confusion matrix not in the model metadata file; not fabricated.)
 
 ### Phase 4 — Winning-plan correctness + UX (from the 17-agent review)
 - ☐ verify/remove 1GB tar + scratch dumps; branding; .env.example; rate-limit/day; OpenAI timeout +
@@ -79,5 +83,11 @@ the budget on the additive pieces a harsh judge actually grades. Full design: do
 - Baseline (all-fixes-assumed): 85/100. Biggest blocker: validated school-level footprint intelligence.
 - Phase 1 shipped: footprint model + /school-insight digest + 8 unit tests (closes the #1 codeable gap).
 - Phase 2 shipped: privacy engine (consent gate, retention minimization, teacher review, export/delete,
-  audit log, model card) + 8 integration tests. Addresses the FERPA/COPPA "can-disqualify" gap. CP1
-  council re-grade not yet re-run.
+  audit log, model card) + 8 integration tests. Addresses the FERPA/COPPA "can-disqualify" gap.
+- Phase 3 (slice): in-app AI report card from real eval output.
+- CP1 (2026-06-18, codex/gpt-5.5, Phase 1+2+3 real): 87/100 (was 85). Per-dim: ProblemFit 91/A-,
+  AIDepth 87/B+, UX 80/B, ResponsibleAI 94/A (standout), Execution 89/A-, Presentation/Demo 72/C+
+  (score sink), Originality 88/A-. #1 blocker: polished end-to-end evidence-backed demo w/ a real
+  school scenario (deployed URL + video + demo script + arch diagram + comparison table). Council's
+  top-3 AI fixes == remaining Phase 3 items (labeled retrieval Recall@k/MRR, semantic entailment gate,
+  in-app model cards). Next: finish Phase 3, then Phase 4.

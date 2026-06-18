@@ -16,6 +16,15 @@ const P = require('../utils/privacy');
 
 const router = express.Router();
 
+// Real model-card numbers for the in-repo litter CNN, read from its metadata file so
+// the card never drifts from the shipped model. Degrades to limits-only if missing.
+let CNN_CARD = null;
+try {
+  const meta = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'model', 'trash_detector.json'), 'utf8'));
+  const total = Object.values(meta.counts || {}).reduce((a, b) => a + Number(b || 0), 0);
+  CNN_CARD = `Validation accuracy ${meta.val_acc} on ${total} labeled images (${meta.counts?.not_trash ?? '?'} not-litter / ${meta.counts?.trash ?? '?'} litter), ${meta.img_size}px input. Binary litter / not-litter.`;
+} catch (_) { /* model card degrades to limits-only */ }
+
 const CLEAR_COOKIE = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' };
 const CLEAR_CSRF_COOKIE = { httpOnly: false, secure: CLEAR_COOKIE.secure, sameSite: 'lax' };
 
@@ -54,7 +63,7 @@ router.get('/policy', (_req, res) => {
     models: [
       { name: 'OpenAI gpt-4o-mini (vision + text)', use: 'Perceives the photo and proposes an action label + attributes. It NEVER awards points or computes CO2e.', limits: 'May misclassify unusual photos; gated by a confidence floor + an adversarial fraud screen.' },
       { name: 'text-embedding-3-small', use: 'Embeds the approved research corpus for retrieval (the Eco Coach / Research Library).', limits: 'Retrieval is brute-force cosine over the corpus — a documented demo-scale choice.' },
-      { name: 'In-repo ONNX litter CNN', use: 'Offline fallback for trash detection when no API key is present.', limits: 'Trained on a public litter dataset; coarse severity only.' },
+      { name: 'In-repo ONNX litter CNN', use: 'Offline fallback for trash detection when no API key is present.', metrics: CNN_CARD, limits: 'Trained on a public litter dataset; coarse severity only; class-imbalanced toward litter.' },
     ],
     responsibleAi: 'Perception (the LLM) and calculation (a deterministic carbon engine using cited EPA/OWID factors) are split. The model proposes; the server disposes. Points are computed server-side and capped; the LLM cannot mint them.',
     rights: ['GET /api/privacy/export — download all your data', 'POST /api/privacy/account/delete — erase your account and cascade'],
