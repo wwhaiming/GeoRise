@@ -17,6 +17,7 @@ const { retrieve, ingestSourceChunks } = require('../utils/coachRetrieval');
 const { gate, coverage, deterministicFaithfulness, SIM_FLOOR } = require('../utils/coachFaithfulness');
 const { computeGrant } = require('../utils/coachScoring');
 const { generateCoachQuestion, generateCoachGuidance, answerFromSources, summarizePaper, paperVisual } = require('../utils/aiClient');
+const { estimateFootprint, actionLeverage } = require('../utils/footprintModel');
 const { awardPoints } = require('../utils/pointsEngine');
 
 const router = express.Router();
@@ -320,6 +321,89 @@ router.get('/papers/:id/visual', authMiddleware, async (req, res) => {
     res.json({ visual });
   } catch (err) {
     console.error('coach /visual error:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ── School hidden-footprint (Direction B core) ──
+// Lazily ensure the additive baseline table; isolated from db.js init, no migration.
+function ensureFootprintTable(db) {
+  db.prepare("CREATE TABLE IF NOT EXISTS school_baselines (leaderboard_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))").run();
+}
+function boardForUser(db, req) {
+  const lb = String(req.query.leaderboardId || req.body?.leaderboardId || '').trim();
+  if (!lb) return null;
+  const isMember = db.prepare('SELECT 1 FROM leaderboard_members WHERE leaderboard_id = ? AND user_id = ?').get(lb, req.userId);
+  const isOrg = db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId);
+  return (isMember || isOrg) ? lb : null;
+}
+// Map a footprint category to a retrieval query for the grounded recommendation.
+const FOOTPRINT_QUERY = {
+  electricity: 'school electricity energy conservation emissions reduction',
+  natural_gas: 'building heating energy efficiency emissions',
+  commuting: 'school commuting transportation emissions active travel',
+  cafeteria_food: 'cafeteria food waste plant-based diet emissions reduction',
+  landfill_waste: 'school waste recycling landfill diversion emissions',
+  water: 'water conservation use reduction',
+};
+
+// Save a teacher/organizer baseline for the board (only board members/organizers).
+router.post('/school-footprint', authMiddleware, async (req, res) => {
+  const db = getDb();
+  const lb = boardForUser(db, req);
+  if (!lb) return res.status(403).json({ error: 'Join or organize this board to set its footprint baseline.' });
+  ensureFootprintTable(db);
+  const b = req.body || {};
+  // Whitelist numeric inputs; everything else falls back to labeled defaults.
+  const keys = ['students', 'monthlyKwh', 'monthlyGasTherms', 'busMilesPerWeek', 'pctDrivenStudents', 'dailyMealsServed', 'landfillBagsPerWeek', 'monthlyWaterM3'];
+  const baseline = {};
+  for (const k of keys) if (Number.isFinite(+b[k])) baseline[k] = +b[k];
+  db.prepare("INSERT INTO school_baselines (leaderboard_id, data, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(leaderboard_id) DO UPDATE SET data = excluded.data, updated_at = datetime('now')").run(lb, JSON.stringify(baseline));
+  res.json({ success: true, footprint: estimateFootprint(baseline) });
+});
+
+// The hidden-footprint digest: biggest institutional emitter + student action leverage +
+// a grounded, cited next step. Refuses to cite when the corpus does not support it.
+router.get('/school-insight', authMiddleware, async (req, res) => {
+  try {
+    const db = getDb();
+    const lb = boardForUser(db, req);
+    ensureFootprintTable(db);
+    let baseline = {};
+    if (lb) {
+      const row = db.prepare('SELECT data FROM school_baselines WHERE leaderboard_id = ?').get(lb);
+      if (row) { try { baseline = JSON.parse(row.data) || {}; } catch { baseline = {}; } }
+      if (baseline.students == null) {
+        const m = db.prepare('SELECT COUNT(*) c FROM leaderboard_members WHERE leaderboard_id = ?').get(lb).c;
+        if (m > 0) baseline.students = m;
+      }
+    }
+    const footprint = estimateFootprint(baseline);
+    // Student action savings this week on the board (the offsetting side).
+    let savedWeek = 0;
+    if (lb) savedWeek = db.prepare("SELECT COALESCE(SUM(co2_saved),0) s FROM posts WHERE leaderboard_id = ? AND created_at > datetime('now','-7 day')").get(lb).s || 0;
+    const leverage = actionLeverage(savedWeek, footprint, 'week');
+
+    // Grounded, cited recommendation for the biggest emitter — same gate as /guidance.
+    let recommendation = null;
+    const cat = footprint.biggestEmitter?.category;
+    if (cat) {
+      const chunks = await retrieve(db, FOOTPRINT_QUERY[cat] || cat, { k: 5 });
+      if (chunks.length) {
+        const draft = await generateCoachGuidance(chunks, { category: footprint.biggestEmitter.label });
+        if (draft && !draft.refusal) {
+          const ids = new Set(chunks.map(c => c.id));
+          const sids = Array.isArray(draft.sourceIds) ? draft.sourceIds.filter(id => ids.has(id)) : [];
+          const f = sids.length ? deterministicFaithfulness({ explanation: draft.explanation || '', sourceIds: sids }, chunks) : 0;
+          if (sids.length && f >= SIM_FLOOR) {
+            recommendation = { recommendation: String(draft.recommendation || ''), action: String(draft.action || ''), explanation: String(draft.explanation || ''), faithfulness: f, sources: snippetsForChunks(db, sids) };
+          }
+        }
+      }
+    }
+    res.json({ footprint, leverage, recommendation, hasBaseline: !!lb && Object.keys(baseline).length > 0 });
+  } catch (err) {
+    console.error('coach /school-insight error:', err.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
