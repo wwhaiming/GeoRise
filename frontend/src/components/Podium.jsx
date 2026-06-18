@@ -3,8 +3,13 @@ import Avatar from './Avatar';
 import { RankBadge } from './UI';
 import { METAL } from './constants';
 
+// Metric-aware value + unit so the podium can rank/display by points OR CO2e avoided.
+const fmtVal = (p, metric) => metric === 'co2' ? String(p.co2 ?? 0) : (p.points ?? p.pts ?? 0).toLocaleString();
+const unitLong = (metric) => metric === 'co2' ? 'KG CO₂e' : 'POINTS';
+const unitShort = (metric) => metric === 'co2' ? 'KG' : 'PTS';
+
 /* ---------- Podium: CARDS ---------- */
-function PodiumCards({ top3, bump }) {
+function PodiumCards({ top3, bump, metric }) {
   const order = [top3[1], top3[0], top3[2]];
   const ranks = [2, 1, 3];
   return (
@@ -23,8 +28,8 @@ function PodiumCards({ top3, bump }) {
                 <Avatar src={p.avatar || p.img} name={p.name} size={first ? 70 : 56} ring={m.a} glow />
               </div>
               <div style={{ marginTop: 8, fontFamily: 'var(--display)', fontWeight: 600, fontSize: first ? 15 : 13.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-              <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: first ? 24 : 20, color: m.a, marginTop: 2 }}>{(p.points ?? p.pts ?? 0).toLocaleString()}</div>
-              <div className="dim" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5 }}>POINTS</div>
+              <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: first ? 24 : 20, color: m.a, marginTop: 2 }}>{fmtVal(p, metric)}</div>
+              <div className="dim" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .5 }}>{unitLong(metric)}</div>
               <div style={{ marginTop: 8 }}><RankBadge rank={r} /></div>
             </div>
           </div>
@@ -35,7 +40,7 @@ function PodiumCards({ top3, bump }) {
 }
 
 /* ---------- Podium: 3D STAND ---------- */
-function PodiumStand({ top3, bump }) {
+function PodiumStand({ top3, bump, metric }) {
   const order = [top3[1], top3[0], top3[2]];
   const ranks = [2, 1, 3];
   const heights = { 1: 118, 2: 84, 3: 66 };
@@ -50,7 +55,7 @@ function PodiumStand({ top3, bump }) {
               <Avatar src={p.avatar || p.img} name={p.name} size={first ? 64 : 52} ring={m.a} glow style={{ boxShadow: `0 0 22px ${m.glow}` }} />
             </div>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 13, marginBottom: 2, maxWidth: '100%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name.split(' ')[0]}</div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: m.a, marginBottom: 8 }}>{(p.points ?? p.pts ?? 0).toLocaleString()}</div>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: m.a, marginBottom: 8 }}>{fmtVal(p, metric)}</div>
             <div style={{ width: '100%', height: heights[r], position: 'relative', borderRadius: '8px 8px 0 0', overflow: 'hidden',
               background: `linear-gradient(180deg, ${m.a}, ${m.b})`, boxShadow: `0 -6px 26px ${m.glow}, inset 0 2px 0 rgba(255,255,255,.5)` }}>
               <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,.25), transparent 30%)' }} />
@@ -64,7 +69,7 @@ function PodiumStand({ top3, bump }) {
 }
 
 /* ---------- Podium: MEDALS ---------- */
-function PodiumMedals({ top3, bump }) {
+function PodiumMedals({ top3, bump, metric }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '6px 2px' }}>
       {top3.map((p, i) => {
@@ -88,8 +93,8 @@ function PodiumMedals({ top3, bump }) {
                 <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>{m.label} place · {p.handle}</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 19, color: m.a }}>{(p.points ?? p.pts ?? 0).toLocaleString()}</div>
-                <div className="dim" style={{ fontSize: 10, fontWeight: 800, letterSpacing: .5 }}>PTS</div>
+                <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 19, color: m.a }}>{fmtVal(p, metric)}</div>
+                <div className="dim" style={{ fontSize: 10, fontWeight: 800, letterSpacing: .5 }}>{unitShort(metric)}</div>
               </div>
             </div>
           </div>
@@ -99,9 +104,9 @@ function PodiumMedals({ top3, bump }) {
   );
 }
 
-export default function Podium({ top3, variant = 'cards', bump }) {
+export default function Podium({ top3, variant = 'cards', bump, metric = 'points' }) {
   if (!top3 || top3.length < 3) return null;
-  if (variant === 'stand') return <PodiumStand top3={top3} bump={bump} />;
-  if (variant === 'medals') return <PodiumMedals top3={top3} bump={bump} />;
-  return <PodiumCards top3={top3} bump={bump} />;
+  if (variant === 'stand') return <PodiumStand top3={top3} bump={bump} metric={metric} />;
+  if (variant === 'medals') return <PodiumMedals top3={top3} bump={bump} metric={metric} />;
+  return <PodiumCards top3={top3} bump={bump} metric={metric} />;
 }

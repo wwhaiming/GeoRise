@@ -92,10 +92,12 @@ router.get('/:id', authMiddleware, (req, res) => {
 
     // NOTE: email is intentionally NOT selected (no PII leak to other members).
     const allMembers = db.prepare(`
-      SELECT lm.leaderboard_id, lm.user_id, lm.role, lm.points, lm.streak, u.name, u.handle, u.avatar
+      SELECT lm.leaderboard_id, lm.user_id, lm.role, lm.points, lm.streak, u.name, u.handle, u.avatar,
+        (SELECT COALESCE(SUM(co2_saved), 0) FROM posts p
+           WHERE p.user_id = lm.user_id AND p.leaderboard_id = lm.leaderboard_id AND p.status = 'published') AS co2
       FROM leaderboard_members lm JOIN users u ON u.id = lm.user_id
       WHERE lm.leaderboard_id = ? ORDER BY lm.points DESC, lm.streak DESC, lm.last_action_date ASC, lm.user_id ASC
-    `).all(req.params.id);
+    `).all(req.params.id).map(m => ({ ...m, co2: Math.round((m.co2 || 0) * 10) / 10 }));
     // include_self governs whether the organizer is ranked among competitors. When
     // off, drop the organizer row before ranking so ranks stay contiguous.
     const members = board.include_self ? allMembers : allMembers.filter(m => m.role !== 'organizer');
