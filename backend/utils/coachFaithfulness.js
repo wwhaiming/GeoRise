@@ -28,12 +28,30 @@ function coverage(claim, evidence) {
 // gate: token-overlap can pass an answer that invented a number ("cuts emissions 80%")
 // while reusing supported words. This catches that fabricated-figure class. It is a
 // heuristic entailment PROXY, not a learned NLI model — labeled honestly as such.
-function numericClaims(s) {
-  return (String(s || '').match(/\d+(?:\.\d+)?\s?%?/g) || []).map(x => x.replace(/\s/g, ''));
+// Parse figures as {value, pct}. Strips thousands commas; treats a trailing % OR the
+// word "percent" as a percentage. "2,000"->2000; "15%"/"15 percent"->{15,pct}.
+function parseNumbers(s) {
+  const text = String(s || '').toLowerCase().replace(/(\d),(?=\d{3}\b)/g, '$1');
+  const out = [];
+  for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(%|percent)?/g)) {
+    out.push({ value: parseFloat(m[1]), pct: !!m[2] });
+  }
+  return out;
 }
+// Numeric figures the answer asserts that NO same-kind figure in the evidence supports
+// (by VALUE, not digit-substring). Catches invented figures while accepting equivalent
+// surface forms (15% == "15 percent", 0.40 == 0.4); avoids "5" matching "50". Deduped.
 function unsupportedNumbers(claim, evidence) {
-  const ev = String(evidence || '').replace(/\s/g, '');
-  return numericClaims(claim).filter(num => !ev.includes(num));
+  const ev = parseNumbers(evidence);
+  const bad = [];
+  for (const c of parseNumbers(claim)) {
+    const ok = ev.some(e => e.pct === c.pct && Math.abs(e.value - c.value) <= Math.max(0.01, Math.abs(c.value) * 0.001));
+    if (!ok) bad.push(c.pct ? `${c.value}%` : `${c.value}`);
+  }
+  return [...new Set(bad)];
+}
+function numericClaims(s) {
+  return parseNumbers(s).map(n => (n.pct ? `${n.value}%` : `${n.value}`));
 }
 
 function validateCitations(sourceIds, retrievedIds) {

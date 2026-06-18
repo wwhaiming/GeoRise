@@ -346,6 +346,7 @@ function createIndexes() {
     CREATE INDEX IF NOT EXISTS idx_canswers_user   ON coach_answers(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_ctips_date      ON coach_daily_tips(user_id, deliver_date);
     CREATE INDEX IF NOT EXISTS idx_posts_status    ON posts(leaderboard_id, status, created_at);
+    CREATE INDEX IF NOT EXISTS idx_posts_co2        ON posts(user_id, leaderboard_id, status, co2_saved);
     CREATE INDEX IF NOT EXISTS idx_posts_expiry    ON posts(image_expires_at) WHERE image_expires_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_trash_expiry    ON trash_reports(image_expires_at) WHERE image_expires_at IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_consent_board   ON consent_records(leaderboard_id, user_id);

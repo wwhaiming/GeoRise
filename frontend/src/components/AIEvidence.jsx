@@ -114,13 +114,21 @@ function ToolCalls({ tools, accent }) {
 
 export default function AIEvidence({ data, onClose }) {
   const panelRef = useRef(null);
-  // Accessible modal: Escape closes, focus moves into the dialog on open.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  // Accessible modal, MOUNT-ONLY: Escape closes, focus moves into the dialog on open,
+  // and focus is restored to the triggering control on close. Deps [] (onClose via ref)
+  // so unrelated parent re-renders don't tear down the listener or steal focus.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    const prev = document.activeElement;
+    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current?.(); };
     document.addEventListener('keydown', onKey);
     panelRef.current?.focus();
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (prev && typeof prev.focus === 'function') prev.focus();
+    };
+  }, []);
   if (!data) return null;
   const accepted = !!data.accepted;
   const isTrash = data.kind === 'trash';

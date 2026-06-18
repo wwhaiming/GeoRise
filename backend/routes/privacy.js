@@ -169,6 +169,11 @@ router.post('/posts/:id/review', authMiddleware, body('reviewPost'), (req, res) 
     if (!post.leaderboard_id || !organizerOf(db, post.leaderboard_id, req.userId)) {
       return res.status(403).json({ error: 'Only the organizer of this post\'s board can review it' });
     }
+    // Only undecided posts are reviewable — prevents an approve-after-reject from leaving
+    // the post hidden with its points still clawed back (and vice-versa).
+    if (post.status !== 'pending') {
+      return res.status(409).json({ error: 'This post has already been reviewed.', status: post.status });
+    }
     const { decision, reason } = req.valid;
     const apply = db.transaction(() => {
       if (decision === 'approve') {
@@ -176,11 +181,11 @@ router.post('/posts/:id/review', authMiddleware, body('reviewPost'), (req, res) 
         return { reversedPoints: 0 };
       }
       // reject: hide it and claw back any points credited to the author for this post
-      const ev = db.prepare("SELECT user_id, leaderboard_id, points FROM point_events WHERE source = 'eco_action' AND source_id = ?").get(req.params.id);
+      const ev = db.prepare("SELECT user_id, leaderboard_id, points FROM point_events WHERE source IN ('eco_action', 'trash') AND source_id = ?").get(req.params.id);
       let reversedPoints = 0;
       if (ev && ev.leaderboard_id) {
         db.prepare('UPDATE leaderboard_members SET points = MAX(0, points - ?) WHERE leaderboard_id = ? AND user_id = ?').run(ev.points, ev.leaderboard_id, ev.user_id);
-        db.prepare("DELETE FROM point_events WHERE source = 'eco_action' AND source_id = ?").run(req.params.id);
+        db.prepare("DELETE FROM point_events WHERE source IN ('eco_action', 'trash') AND source_id = ?").run(req.params.id);
         reversedPoints = ev.points;
       }
       db.prepare("UPDATE posts SET status = 'rejected', hidden = 1, reviewed_by = ?, reviewed_at = datetime('now') WHERE id = ?").run(req.userId, req.params.id);

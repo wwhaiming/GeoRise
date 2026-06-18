@@ -177,6 +177,32 @@ test('pseudonymous board masks other members to initials; you still see yourself
   assert.equal(other.handle, '', 'other member handle hidden when pseudonymous');
 });
 
+test('pseudonymous board also masks poster names in the FEED (not just the leaderboard)', async () => {
+  const teacher = await newUser('Teacher Name'); const s1 = await newUser('Stu One');
+  const board = await makeBoard(teacher, 'PseudoFeed');
+  await joinBoard(s1, board);
+  await setPrivacy(teacher, board, { displayMode: 'initials' });
+  const post = await request(app).post('/api/posts').set(...auth(teacher.token)).send({ image: png(31), leaderboardId: board.id, miles: 5 });
+  assert.equal(post.body.accepted, true);
+  const feed = await request(app).get(`/api/posts?leaderboardId=${board.id}`).set(...auth(s1.token));
+  assert.equal(feed.status, 200);
+  const tp = feed.body.posts.find(p => p.user_id === teacher.id);
+  assert.ok(tp, 'teacher post present in feed');
+  assert.ok(/^[A-Z]\.([A-Z]\.)?$/.test(tp.user_name), `feed name should be masked, got "${tp.user_name}"`);
+  assert.equal(tp.user_handle, '', 'feed handle hidden when pseudonymous');
+});
+
+test('a reviewed post cannot be re-reviewed (no approve-after-reject)', async () => {
+  const teacher = await newUser('Rev'); const board = await makeBoard(teacher, 'Rev2');
+  await setPrivacy(teacher, board, { reviewRequired: true });
+  const post = await request(app).post('/api/posts').set(...auth(teacher.token)).send({ image: png(41), leaderboardId: board.id, miles: 5 });
+  assert.equal(post.body.pendingReview, true);
+  const rej = await request(app).post(`/api/privacy/posts/${post.body.postId}/review`).set(...auth(teacher.token)).send({ decision: 'reject' });
+  assert.equal(rej.status, 200);
+  const again = await request(app).post(`/api/privacy/posts/${post.body.postId}/review`).set(...auth(teacher.token)).send({ decision: 'approve' });
+  assert.equal(again.status, 409, 'an already-reviewed post must not be re-reviewable');
+});
+
 test('public model/data card is served', async () => {
   const r = await request(app).get('/api/privacy/policy');
   assert.equal(r.status, 200);

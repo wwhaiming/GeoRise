@@ -82,6 +82,13 @@ function getUserContext(userId, leaderboardId, isQuestCompletion = false, tagged
 function processEcoAction(params) {
   const db = getDb();
   const run = db.transaction((p) => {
+    // Concurrency guard: the route's dup check ran BEFORE its awaited AI calls, so two
+    // simultaneous posts of the same photo can both reach here. Re-check inside the
+    // (serialized) transaction so the second aborts instead of double-awarding points.
+    if (p.imageHash) {
+      const dupNow = db.prepare("SELECT id FROM posts WHERE user_id = ? AND image_hash = ? AND created_at > datetime('now','-1 day')").get(p.userId, p.imageHash);
+      if (dupNow) return { duplicate: true };
+    }
     const ctx = getUserContext(p.userId, p.leaderboardId, p.isQuestCompletion, p.taggedUserIds || []);
 
     // Grounded CO2 (from carbonEngine, passed by the route) drives scoring AND

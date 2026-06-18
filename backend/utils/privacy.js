@@ -189,8 +189,20 @@ function deleteUserData(db, userId) {
   return run();
 }
 
+// ── Pseudonymous display (minors): "Maya Chen" -> "M.C." + blank handle/avatar ──
+function initials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'Anon';
+  return parts.slice(0, 2).map(p => p[0].toUpperCase()).join('.') + '.';
+}
+// Mask a joined user row on a pseudonymous board. Never masks the viewer's own row.
+function maskDisplay(row, { mode, isSelf, nameKey = 'user_name', handleKey = 'user_handle', avatarKey = 'user_avatar' } = {}) {
+  if (mode !== 'initials' || isSelf || !row) return row;
+  return { ...row, [nameKey]: initials(row[nameKey]), [handleKey]: '', [avatarKey]: '' };
+}
+
 module.exports = {
-  CONSENT_MODES, RETENTION_MODES,
+  CONSENT_MODES, RETENTION_MODES, initials, maskDisplay,
   boardPrivacy, consentStatus, consentSatisfied, recordConsent,
   makeThumbnail, applyRetention, purgeExpiredImages,
   auditLog, exportUserData, deleteUserData,

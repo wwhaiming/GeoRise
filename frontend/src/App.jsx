@@ -36,7 +36,7 @@ const MOCK_MEMBERS = [
   { user_id: 'zoe', name: 'Zoe Bennett', handle: '@zoeb', points: 2740, avatar: 'https://i.pravatar.cc/200?img=44', streak: 1 },
   { user_id: 'omar', name: 'Omar Reyes', handle: '@omarr', points: 2510, avatar: 'https://i.pravatar.cc/200?img=50', streak: 3 },
   { user_id: 'tess', name: 'Tess Lindqvist', handle: '@tessl', points: 2280, avatar: 'https://i.pravatar.cc/200?img=20', streak: 2 },
-].map((m, i) => ({ ...m, rank: i + 1 }));
+].map((m, i) => ({ ...m, rank: i + 1, co2: +(((m.points || 0) / 1000).toFixed(1)) }));
 
 const MOCK_POSTS = [
   { id: 'p1', user_id: 'maya', user_name: 'Maya Chen', user_handle: '@mayagrows', user_avatar: 'https://i.pravatar.cc/200?img=47', image: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=60&auto=format&fit=crop', action_type: 'Transport', action_desc: 'Biked to campus instead of driving', co2_saved: 2.4, points: 60, caption: 'Morning ride was unreal 🚲 beat my record. Who else is car-free this week? @devonp', like_count: 48, liked: false, comment_count: 6, created_at: new Date(Date.now() - 14 * 60000).toISOString() },
@@ -182,6 +182,8 @@ export default function App() {
 
   // ── Navigation ──
   const go = (s) => { setScreen(s); setModal(null); };
+  // Stable identity so the AIEvidence dialog's focus effect doesn't re-run on every render.
+  const closeEvidence = useCallback(() => setEvidence(null), []);
 
   // ── Points + confetti ──
   const flashBump = (id) => { setBump(id); setTimeout(() => setBump(null), 700); };
@@ -192,7 +194,7 @@ export default function App() {
       updated.sort((a, b) => (b.points || 0) - (a.points || 0));
       return updated.map((m, i) => ({ ...m, rank: i + 1 }));
     });
-    flashBump('you');
+    flashBump(members.find(m => m.isYou)?.user_id || 'you');
     const host = document.querySelector('.app');
     if (host) fireConfetti(host, { count: 80, origin: { x: 0.5, y: 0.42 } });
   };
@@ -344,7 +346,7 @@ export default function App() {
       {showNav && <BottomNav screen={screen} go={go} onFab={() => setModal('log')} />}
       {modal === 'log' && <LogAction ctx={ctx} />}
       {modal === 'trash' && <TrashSpotter ctx={ctx} />}
-      {evidence && <AIEvidence data={evidence} onClose={() => setEvidence(null)} />}
+      {evidence && <AIEvidence data={evidence} onClose={closeEvidence} />}
       <Toast toast={toast} />
     </div>
   );

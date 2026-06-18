@@ -43,8 +43,10 @@ try {
 } catch (e) { console.error('startup purge error:', e.message); }
 console.log('✅ Database initialized');
 
-// Startup self-check: when the coach is enabled, confirm its corpus is actually
-// retrievable so a misconfigured deploy fails loudly at boot, not silently per request.
+// Startup self-check: when the coach is enabled, log (loudly) whether its corpus is
+// actually retrievable, so a misconfigured deploy is visible in the boot logs instead
+// of failing silently per request. Non-fatal by design — the coach surface 404s
+// gracefully when disabled/empty, so we warn rather than refuse to boot.
 if (process.env.COACH_ENABLED === 'true' && process.env.NODE_ENV !== 'test') {
   (async () => {
     try {

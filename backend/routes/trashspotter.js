@@ -10,7 +10,7 @@ const { awardPoints } = require('../utils/pointsEngine');
 const { evaluateAdversarial } = require('../utils/integrityGates');
 const { imageHash, perceptualHash, hammingDistance } = require('../utils/imageHash');
 const { body } = require('../utils/validate');
-const { boardPrivacy, consentSatisfied, applyRetention, auditLog } = require('../utils/privacy');
+const { boardPrivacy, consentSatisfied, applyRetention, auditLog, maskDisplay } = require('../utils/privacy');
 
 const router = express.Router();
 
@@ -100,6 +100,7 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
     // Retention: persist only a thumbnail (or nothing) per the board's policy. The
     // dedup hash/phash were taken from the full image above, so fraud screens hold.
     const priv = boardPrivacy(db, leaderboardId);
+    const reviewRequired = priv ? priv.reviewRequired : false;
     const ret = await applyRetention(priv ? priv.retentionMode : 'minimize', image);
     const derivedLabel = `Trash report — severity ${severity.score}/10`;
     // The dup check above runs BEFORE the awaited AI call, so two concurrent reports
@@ -112,10 +113,11 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('tras
       db.prepare(`INSERT INTO trash_reports (id, user_id, leaderboard_id, image, image_hash, phash, severity, description, estimated_items, location, points, retention_mode, image_expires_at, derived_label)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(id, req.userId, leaderboardId || null, ret.storedImage, hash, phash || null, severity.score, severity.description, severity.estimatedItems || '', location || '', points, ret.retentionMode, ret.expiresAt, derivedLabel);
-      db.prepare(`INSERT INTO posts (id, user_id, leaderboard_id, image, image_hash, phash, action_type, action_desc, co2_saved, points, caption, retention_mode, image_expires_at, derived_label)
-        VALUES (?, ?, ?, ?, ?, ?, 'nature', 'Trash report', 0.5, ?, ?, ?, ?, ?)`)
-        .run(postId, req.userId, leaderboardId || null, ret.storedImage, hash, phash || null, points, `Trash spotted${location ? ' at ' + location : ''} — severity ${severity.score}/10`, ret.retentionMode, ret.expiresAt, derivedLabel);
-      awardPoints(req.userId, leaderboardId, points, { source: 'trash', sourceId: id });
+      db.prepare(`INSERT INTO posts (id, user_id, leaderboard_id, image, image_hash, phash, action_type, action_desc, co2_saved, points, caption, retention_mode, image_expires_at, derived_label, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'nature', 'Trash report', 0.5, ?, ?, ?, ?, ?, ?)`)
+        .run(postId, req.userId, leaderboardId || null, ret.storedImage, hash, phash || null, points, `Trash spotted${location ? ' at ' + location : ''} — severity ${severity.score}/10`, ret.retentionMode, ret.expiresAt, derivedLabel, reviewRequired ? 'pending' : 'published');
+      // sourceId = postId (not the report id) so a teacher rejecting the post in review can reverse these points.
+      awardPoints(req.userId, leaderboardId, points, { source: 'trash', sourceId: postId });
       return { duplicate: false };
     })();
     if (result.duplicate) {
@@ -147,11 +149,13 @@ router.get('/', authMiddleware, (req, res) => {
     if (leaderboardId && !isBoardMember(db, leaderboardId, req.userId)) {
       return res.status(403).json({ error: 'Join this leaderboard to view its reports' });
     }
-    const reports = leaderboardId
+    const mode = leaderboardId ? (boardPrivacy(db, leaderboardId)?.displayMode || 'names') : 'names';
+    const reports = (leaderboardId
       ? db.prepare(`SELECT tr.*, u.name as user_name, u.handle as user_handle, u.avatar as user_avatar
            FROM trash_reports tr JOIN users u ON u.id = tr.user_id WHERE tr.leaderboard_id = ? ORDER BY tr.created_at DESC LIMIT 100`).all(leaderboardId)
       : db.prepare(`SELECT tr.*, u.name as user_name, u.handle as user_handle, u.avatar as user_avatar
-           FROM trash_reports tr JOIN users u ON u.id = tr.user_id WHERE tr.user_id = ? ORDER BY tr.created_at DESC LIMIT 100`).all(req.userId);
+           FROM trash_reports tr JOIN users u ON u.id = tr.user_id WHERE tr.user_id = ? ORDER BY tr.created_at DESC LIMIT 100`).all(req.userId))
+      .map(r => maskDisplay(r, { mode, isSelf: r.user_id === req.userId }));
     res.json({ reports });
   } catch (err) {
     console.error('Get trash reports error:', err);

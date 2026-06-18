@@ -72,6 +72,9 @@ function band(kg, f) {
 function estimateFootprint(baseline = {}) {
   const students = Math.max(1, Number(baseline.students) || 500);
   const cats = [];
+  // A teacher-entered 0 is a REAL value (solar school, no gas, no meals), not "missing".
+  // Use finite-ness, not truthiness, for the provided/confidence/assumptions branches.
+  const has = (v) => Number.isFinite(+v);
   const push = (category, kg, factor, confidence, assumptions, provided) => {
     const c = round(kg);
     cats.push({
@@ -85,16 +88,16 @@ function estimateFootprint(baseline = {}) {
   // Electricity: real monthly kWh if given, else ~6 kWh/student/school-day default.
   const kwh = Number.isFinite(+baseline.monthlyKwh) ? +baseline.monthlyKwh : students * 6 * SCHOOL_DAYS_PER_MONTH;
   push('electricity', kwh * FACTORS.electricity_kwh.value, FACTORS.electricity_kwh,
-    baseline.monthlyKwh ? 'medium' : 'low',
-    [baseline.monthlyKwh ? `Provided ${kwh} kWh/month` : `Default ~6 kWh/student/day × ${students} students × ${SCHOOL_DAYS_PER_MONTH} days`, 'US-average grid intensity; real value varies sharply by region'],
-    baseline.monthlyKwh);
+    has(baseline.monthlyKwh) ? 'medium' : 'low',
+    [has(baseline.monthlyKwh) ? `Provided ${kwh} kWh/month` : `Default ~6 kWh/student/day × ${students} students × ${SCHOOL_DAYS_PER_MONTH} days`, 'US-average grid intensity; real value varies sharply by region'],
+    has(baseline.monthlyKwh));
 
   // Natural gas heating: therms if given, else ~0.5 therm/student/month default.
   const therms = Number.isFinite(+baseline.monthlyGasTherms) ? +baseline.monthlyGasTherms : students * 0.5;
   push('natural_gas', therms * FACTORS.natural_gas_therm.value, FACTORS.natural_gas_therm,
-    baseline.monthlyGasTherms ? 'medium' : 'low',
-    [baseline.monthlyGasTherms ? `Provided ${therms} therms/month` : `Default ~0.5 therm/student/month × ${students} students`, 'Heating load swings with climate + building envelope'],
-    baseline.monthlyGasTherms);
+    has(baseline.monthlyGasTherms) ? 'medium' : 'low',
+    [has(baseline.monthlyGasTherms) ? `Provided ${therms} therms/month` : `Default ~0.5 therm/student/month × ${students} students`, 'Heating load swings with climate + building envelope'],
+    has(baseline.monthlyGasTherms));
 
   // Commuting: bus miles/week + a coarse car-commute estimate.
   const busMiles = Number.isFinite(+baseline.busMilesPerWeek) ? +baseline.busMilesPerWeek : students * 1.5;
@@ -102,32 +105,32 @@ function estimateFootprint(baseline = {}) {
   const carMiles = students * carShare * 4 * 2 * SCHOOL_DAYS_PER_MONTH; // round-trip 4mi avg
   const commuteMonthlyMiles = busMiles * WEEKS_PER_MONTH + carMiles;
   push('commuting', commuteMonthlyMiles * FACTORS.vehicle_mile.value, FACTORS.vehicle_mile,
-    (baseline.busMilesPerWeek || baseline.pctDrivenStudents) ? 'medium' : 'low',
+    (has(baseline.busMilesPerWeek) || has(baseline.pctDrivenStudents)) ? 'medium' : 'low',
     [`Bus ${round(busMiles)} mi/wk + ~${Math.round(carShare * 100)}% of ${students} students driven ~8 mi round-trip`, 'Bus per-passenger allocation simplified to vehicle-mile factor'],
-    !!(baseline.busMilesPerWeek || baseline.pctDrivenStudents));
+    (has(baseline.busMilesPerWeek) || has(baseline.pctDrivenStudents)));
 
   // Cafeteria food: meals/day if given, else 1 meal/student/day.
   const mealsDay = Number.isFinite(+baseline.dailyMealsServed) ? +baseline.dailyMealsServed : students;
   const mealsMonth = mealsDay * SCHOOL_DAYS_PER_MONTH;
   push('cafeteria_food', mealsMonth * FACTORS.school_meal.value, FACTORS.school_meal,
-    baseline.dailyMealsServed ? 'medium' : 'low',
-    [baseline.dailyMealsServed ? `Provided ${mealsDay} meals/day` : `Default 1 meal/student/day × ${students}`, 'Per-meal factor is a coarse mixed-diet average; menu mix dominates'],
-    baseline.dailyMealsServed);
+    has(baseline.dailyMealsServed) ? 'medium' : 'low',
+    [has(baseline.dailyMealsServed) ? `Provided ${mealsDay} meals/day` : `Default 1 meal/student/day × ${students}`, 'Per-meal factor is a coarse mixed-diet average; menu mix dominates'],
+    has(baseline.dailyMealsServed));
 
   // Landfill waste: bags/week → ~5 kg/bag default mass.
   const bags = Number.isFinite(+baseline.landfillBagsPerWeek) ? +baseline.landfillBagsPerWeek : Math.ceil(students / 25);
   const wasteKgMonth = bags * 5 * WEEKS_PER_MONTH;
   push('landfill_waste', wasteKgMonth * FACTORS.landfill_kg.value, FACTORS.landfill_kg,
-    baseline.landfillBagsPerWeek ? 'medium' : 'low',
+    has(baseline.landfillBagsPerWeek) ? 'medium' : 'low',
     [`${round(bags)} bags/wk × ~5 kg/bag`, 'WARM landfill factor depends on waste composition + landfill gas capture'],
-    baseline.landfillBagsPerWeek);
+    has(baseline.landfillBagsPerWeek));
 
   // Water: m3/month if given, else ~0.3 m3/student/month.
   const water = Number.isFinite(+baseline.monthlyWaterM3) ? +baseline.monthlyWaterM3 : students * 0.3;
   push('water', water * FACTORS.water_m3.value, FACTORS.water_m3,
-    baseline.monthlyWaterM3 ? 'medium' : 'low',
-    [baseline.monthlyWaterM3 ? `Provided ${water} m3/month` : `Default ~0.3 m3/student/month × ${students}`, 'Embodied energy of supply + treatment; coarse literature value'],
-    baseline.monthlyWaterM3);
+    has(baseline.monthlyWaterM3) ? 'medium' : 'low',
+    [has(baseline.monthlyWaterM3) ? `Provided ${water} m3/month` : `Default ~0.3 m3/student/month × ${students}`, 'Embodied energy of supply + treatment; coarse literature value'],
+    has(baseline.monthlyWaterM3));
 
   cats.sort((a, b) => b.kgCO2ePerMonth - a.kgCO2ePerMonth);
   const totalKgPerMonth = round(cats.reduce((s, c) => s + c.kgCO2ePerMonth, 0));

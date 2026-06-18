@@ -12,7 +12,7 @@ const { evaluateAdversarial } = require('../utils/integrityGates');
 const { imageHash, perceptualHash, hammingDistance } = require('../utils/imageHash');
 const { body, pageParams } = require('../utils/validate');
 const analysisCache = require('../utils/analysisCache');
-const { boardPrivacy, consentSatisfied, applyRetention, auditLog } = require('../utils/privacy');
+const { boardPrivacy, consentSatisfied, applyRetention, auditLog, maskDisplay } = require('../utils/privacy');
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -194,6 +194,11 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
       co2Saved: carbon.kgCO2e, integrityMultiplier: verdict.multiplier,
     });
 
+    // Concurrent same-photo race: the transaction aborted because a row already exists.
+    if (result.duplicate) {
+      return res.status(409).json({ error: 'You already logged this photo recently.', reason: 'duplicate', accepted: false, points: 0 });
+    }
+
     // Stamp privacy state on the row. When the board requires teacher review the
     // post is held as 'pending' (hidden from the feed until approved); points were
     // computed but are reversed if the teacher rejects it (see routes/privacy.js).
@@ -237,6 +242,7 @@ router.get('/', authMiddleware, (req, res) => {
     }
     const common = `
       SELECT p.*, u.name as user_name, u.handle as user_handle, u.avatar as user_avatar,
+        (SELECT display_mode FROM leaderboards WHERE id = p.leaderboard_id) as board_display_mode,
         (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
         (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comment_count,
         EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ?) as liked
@@ -251,7 +257,11 @@ router.get('/', authMiddleware, (req, res) => {
           OR EXISTS (SELECT 1 FROM leaderboard_members lm WHERE lm.leaderboard_id = p.leaderboard_id AND lm.user_id = ?)
           OR EXISTS (SELECT 1 FROM leaderboards l WHERE l.id = p.leaderboard_id AND l.organizer_id = ?)
         ) ORDER BY p.created_at DESC LIMIT ? OFFSET ?`).all(req.userId, req.userId, req.userId, limit, offset);
-    res.json({ posts: posts.map(p => ({ ...p, liked: p.liked > 0 })) });
+    res.json({ posts: posts.map(p => {
+      // Pseudonymous boards: mask other members' identity in the feed too (not just the leaderboard).
+      const m = maskDisplay(p, { mode: p.board_display_mode, isSelf: p.user_id === req.userId });
+      return { ...m, liked: p.liked > 0 };
+    }) });
   } catch (err) {
     console.error('Get posts error:', err);
     res.status(500).json({ error: 'Internal server error' });
@@ -309,9 +319,12 @@ router.post('/:id/comment', authMiddleware, body('comment'), (req, res) => {
 router.get('/:id/comments', authMiddleware, (req, res) => {
   try {
     const db = getDb();
-    if (!loadAccessiblePost(db, req.params.id, req.userId, res)) return;
+    const cpost = loadAccessiblePost(db, req.params.id, req.userId, res);
+    if (!cpost) return;
+    const cmode = boardPrivacy(db, cpost.leaderboard_id)?.displayMode || 'names';
     const comments = db.prepare(`SELECT c.*, u.name as user_name, u.handle as user_handle, u.avatar as user_avatar
-      FROM comments c JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`).all(req.params.id);
+      FROM comments c JOIN users u ON u.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at ASC`).all(req.params.id)
+      .map(c => maskDisplay(c, { mode: cmode, isSelf: c.user_id === req.userId }));
     res.json({ comments });
   } catch (err) {
     console.error('Get comments error:', err);
