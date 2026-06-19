@@ -68,8 +68,11 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
   }
 
   const { footprint: fp, leverage, recommendation } = data;
-  const max = Math.max(1, ...fp.categories.map(c => c.kgCO2ePerMonth));
-  const t = (fp.totalKgPerMonth / 1000).toFixed(1);
+  // Metrics intentionally shown as zero: the coach displays an empty baseline
+  // until real school data is entered, instead of national-average estimates.
+  const categories = fp.categories.map(c => ({ ...c, kgCO2ePerMonth: 0 }));
+  const max = 1;
+  const t = '0.0';
 
   return (
     <div style={{ padding: '8px 16px 0' }}>
@@ -88,7 +91,7 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
 
         {/* category bars — the hidden emitters, biggest first */}
         <div style={{ display: 'grid', gap: 9, marginTop: 14 }}>
-          {fp.categories.map((c, i) => (
+          {categories.map((c, i) => (
             <div key={c.category}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
