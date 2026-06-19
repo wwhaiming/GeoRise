@@ -190,9 +190,28 @@ input, textarea, select { font-family: var(--body); }
   border: 1.5px solid var(--navy-500);
   border-radius: var(--r-md); color: var(--text); font-size: 16px; font-weight: 600;
   padding: 13px 15px; outline: none; transition: border-color .18s, box-shadow .18s;
+  overflow-x: auto;
 }
 .field:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(46,125,79,.14); }
 .field::placeholder { color: var(--text-dim); }
+.field-no-ph::placeholder { color: transparent; }
+.ph-marquee {
+  position: absolute; pointer-events: none; overflow: hidden;
+  display: flex; align-items: center;
+  padding: 13px 15px; box-sizing: border-box;
+}
+.ph-marquee span {
+  display: inline-block; white-space: nowrap;
+  color: var(--text-dim); font-size: 16px; font-weight: 600;
+  font-family: var(--body);
+  will-change: transform;
+}
+.ph-marquee.hovered span { animation: ph-slide 5s ease-in-out infinite; }
+@keyframes ph-slide {
+  0%, 15%  { transform: translateX(0); }
+  60%, 85% { transform: translateX(var(--marquee-px, -80px)); }
+  100%     { transform: translateX(0); }
+}
 
 @keyframes slideScreen {
   from { opacity: 0; transform: translateX(18px); }

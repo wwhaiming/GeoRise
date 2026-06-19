@@ -197,6 +197,7 @@ export function Leaderboard({ ctx }) {
   const [metric, setMetric] = useState('points');
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const handleJoin = async (e) => {
     e?.preventDefault();
@@ -216,7 +217,8 @@ export function Leaderboard({ ctx }) {
     ? [...members].sort((a, b) => (b.co2 || 0) - (a.co2 || 0)).map((m, i) => ({ ...m, rank: i + 1 }))
     : members;
   const top3 = ranked.slice(0, 3);
-  const rest = ranked.slice(3);
+  const rest = ranked.slice(3, 5);
+  const more = ranked.slice(5);
   const teamCo2 = Math.round(members.reduce((s, m) => s + (m.co2 || 0), 0) * 10) / 10;
 
   return (
@@ -240,7 +242,7 @@ export function Leaderboard({ ctx }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="eyebrow" style={{ color: 'var(--green)' }}>Team impact · this season</div>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>{teamCo2} kg CO₂e avoided together</div>
-            <div className="muted" style={{ fontSize: 12, fontWeight: 650, marginTop: 2 }}>Verified across {members.length} members. See where your school&rsquo;s hidden footprint is biggest →</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>Verified across {members.length} member{members.length !== 1 ? 's' : ''}</div>
           </div>
           <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Footprint coach" onClick={() => ctx.go('coach')}><Icon name="sparkle" size={18} color="var(--green)" /></button>
         </div>
@@ -279,12 +281,12 @@ export function Leaderboard({ ctx }) {
         )}
 
         <div className="card" style={{ padding: 6 }}>
-          {rest.map((p, i) => (
+          {[...rest, ...(showAll ? more : [])].map((p, i, arr) => (
             <div key={p.user_id} style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 16,
               background: p.isYou ? 'linear-gradient(90deg, rgba(46,125,79,.12), rgba(46,125,79,.03))' : 'transparent',
               boxShadow: p.isYou ? 'inset 0 0 0 1.5px rgba(46,125,79,.24)' : 'none',
-              borderBottom: i < rest.length - 1 ? '1px solid rgba(45,91,57,.10)' : 'none',
+              borderBottom: i < arr.length - 1 ? '1px solid rgba(45,91,57,.10)' : 'none',
             }}>
               <RankBadge rank={p.rank} />
               <Avatar src={p.avatar} name={p.name} size={42} ring={p.isYou ? 'var(--green)' : undefined} />
@@ -301,6 +303,11 @@ export function Leaderboard({ ctx }) {
               </div>
             </div>
           ))}
+          {more.length > 0 && (
+            <button className="btn btn-ghost btn-sm btn-block" style={{ margin: '6px 0 2px', color: 'var(--green)', fontWeight: 700 }} onClick={() => setShowAll(s => !s)}>
+              {showAll ? 'Show less' : `See all ${members.length} members`}
+            </button>
+          )}
         </div>
 
         <button className="btn btn-purple btn-block" onClick={() => copyInvite(leaderboard?.invite_code, ctx)}>

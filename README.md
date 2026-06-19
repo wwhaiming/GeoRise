@@ -92,7 +92,28 @@ The LLM only appears in the _perceive_ and _draft_ boxes. Every box that touches
 
 ---
 
+## Handling AI Failures: "If the AI gives a wrong answer..."
+
+In standard AI applications, a hallucination or incorrect classification leads to inflated user metrics, database corruption, or user misinformation. In **EcoRise**, we assume the AI is untrusted and build defense-in-depth around it.
+
+### 1. What would happen to the user?
+* **Zero Score/Carbon Corruption:** If the AI hallucinates or exaggerates impact, the user **does not** receive fake points or false CO₂e reductions. The LLM is only permitted to *perceive* tags and attributes. The actual points and emissions are calculated by a **server-side, deterministic carbon and points engine** using verified EPA/OWID factors.
+* **Immediate Transparency:** If the AI processes a submission incorrectly, the user is shown the **AI Evidence Panel** explaining the exact model used, its confidence level, the math formula, and which fraud gates were cleared.
+* **Point Correction:** If a bad submission slips past the AI vision model, teachers/leaderboard organizers have a **moderation queue** where they can manually reject the post, automatically reversing the points server-side.
+* **Refusal Instead of Hallucination:** If the AI Eco Coach cannot support an answer using the approved teacher corpus, the system suppresses the answer entirely and displays a clean refusal card to the user rather than giving a hallucinated response.
+
+### 2. How does the system catch it?
+* **Pre-Generation: The Coach Faithfulness Gate:** Before an AI Eco Coach answer is shown to a user, it must pass a multi-layer pipeline:
+  1. **Citation Validation:** Ensures every source ID cited by the AI exists in the database chunks retrieved from the approved teacher corpus.
+  2. **Lexical & Numeric Claim Verification:** Extracts all numbers and percentages. If the AI introduces any number not present in the source chunk (e.g., fabricating "reduces emissions by 80%"), the answer is immediately rejected.
+  3. **Semantic Entailment Gate:** An independent semantic checker evaluates the generated text against the source chunks to detect logical contradictions.
+* **During Submission: Double-Pass Adversarial Screen:** A secondary vision pass checks for fraud (photos of screens, stock photos, or AI-generated images) to catch cheating or malicious inputs.
+* **Post-Generation: The Live In-App AI Report Card:** EcoRise includes a live evaluation harness that continually measures and displays actual metrics (citation validity, faithfulness rate, refusal precision, hallucination rate, and Retrieval Recall@k/MRR) to teachers and students, ensuring system performance is transparently monitored rather than assumed.
+
+---
+
 ## Tech Stack
+
 
 - **Frontend:** React 19 + Vite · Vitest + Testing Library (11 UI tests)
 - **Backend:** Node.js + Express · Node built-in test runner (91 backend tests)

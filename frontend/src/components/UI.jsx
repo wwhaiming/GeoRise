@@ -1,6 +1,33 @@
-/* EcoRise — Small UI components: PointsChip, RankBadge, Streak, Toast, Switch */
+/* EcoRise — Small UI components: PointsChip, RankBadge, Streak, Toast, Switch, HelpTip */
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from './Icon';
 import { METAL } from './constants';
+
+// ── Help Tip (? button → bottom sheet) ──
+export function HelpTip({ text }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <span style={{ display: 'inline-flex', verticalAlign: 'middle', flexShrink: 0 }}>
+      <button type="button" onClick={e => { e.stopPropagation(); setOpen(true); }} aria-label="More info"
+        style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(45,91,57,.28)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+        ?
+      </button>
+      {open && createPortal(
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, zIndex: 9990, background: 'rgba(12,17,14,.5)', backdropFilter: 'blur(2px)' }} />
+          <div role="dialog" aria-modal="true" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 9991, background: 'var(--navy-900)', borderRadius: '22px 22px 0 0', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', boxShadow: '0 -12px 40px rgba(30,91,57,.18)' }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(45,91,57,.18)', margin: '0 auto 16px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', lineHeight: 1.55 }}>{text}</div>
+            <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary btn-block btn-sm" style={{ marginTop: 16 }}>Got it</button>
+          </div>
+        </>,
+        document.querySelector('.app') || document.body
+      )}
+    </span>
+  );
+}
 
 // ── Points Chip ──
 export function PointsChip({ pts, variant = 'green', prefix = '+', suffix = 'pts', style }) {

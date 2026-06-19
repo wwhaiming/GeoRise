@@ -5,6 +5,7 @@
  * story that judges care about, not just a checklist.
  */
 import Icon from '../components/Icon';
+import { HelpTip } from '../components/UI';
 
 const QUEST_ICONS = { transportation: 'bike', waste: 'drop', energy: 'bolt', food: 'leaf', nature: 'trash', community: 'users' };
 const QUEST_COLORS = { transportation: 'var(--green)', waste: 'var(--blue)', energy: 'var(--yellow)', food: 'var(--green-2)', nature: 'var(--green-d)', community: 'var(--lime)' };
@@ -44,7 +45,7 @@ function QuestCard({ q, ctx }) {
       </div>
       {!done && (
         <button className="btn btn-secondary btn-sm btn-block" style={{ marginTop: 12 }} onClick={ctx.openLog}>
-          <Icon name="camera" size={16} /> Log a photo to progress
+          <Icon name="camera" size={16} /> Log photo
         </button>
       )}
     </div>
@@ -59,36 +60,40 @@ export default function Quests({ ctx }) {
   return (
     <div className="screen-in">
       <div style={{ padding: '18px 18px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div className="eyebrow" style={{ color: 'var(--yellow)' }}>Double points all day</div>
-          <div className="h1" style={{ fontSize: 27 }}>Daily Quests</div>
-        </div>
+        <div className="h1" style={{ fontSize: 27 }}>Quests</div>
         <span style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 14, color: 'var(--yellow)', background: 'rgba(255,210,63,.12)', padding: '6px 13px', borderRadius: 9999 }}>{done}/{quests.length}</span>
+      </div>
+
+      {/* quick actions */}
+      <div style={{ padding: '8px 16px 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <button onClick={ctx.openTrash} className="card" style={{ textAlign: 'left', cursor: 'pointer', border: 'none', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span style={{ width: 42, height: 42, borderRadius: 13, background: 'rgba(255,107,107,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="pin" size={22} color="var(--coral)" /></span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Trash Spotter</span>
+          </button>
+          <button onClick={ctx.openLog} className="card" style={{ textAlign: 'left', cursor: 'pointer', border: 'none', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span style={{ width: 42, height: 42, borderRadius: 13, background: 'rgba(46,125,79,.14)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="camera" size={22} color="var(--green)" /></span>
+            <span style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15, color: 'var(--text)' }}>Log action</span>
+          </button>
+        </div>
       </div>
 
       {/* AI banner */}
       <div style={{ padding: '8px 16px 0' }}>
-        <div className="card" style={{ padding: 15, display: 'flex', gap: 12, alignItems: 'flex-start', border: '1px solid rgba(46,125,79,.18)', background: 'radial-gradient(180px 80px at 90% -10%, rgba(117,183,123,.16), transparent), var(--navy-800)' }}>
-          <span style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0, background: 'rgba(46,125,79,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="sparkle" size={22} color="var(--green)" />
-          </span>
-          <div style={{ flex: 1 }}>
-            <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 4 }}>AI-personalized · refreshes daily</div>
-            <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.45, color: 'var(--text)' }}>
-              These quests are generated for you by AI. The 2× bonus only unlocks when the AI verifies a matching photo — you can&rsquo;t mark them done by hand.
-            </div>
-          </div>
+        <div className="card" style={{ padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', border: '1px solid rgba(46,125,79,.18)' }}>
+          <Icon name="sparkle" size={16} color="var(--green)" />
+          <span className="eyebrow" style={{ color: 'var(--green)', flex: 1 }}>AI-personalized · daily</span>
+          <HelpTip text="Quests are generated for you by AI and refresh each day. The 2× bonus only unlocks when AI verifies a matching photo — you can't mark them done by hand." />
         </div>
       </div>
 
       {/* progress strip */}
       <div style={{ padding: '14px 16px 0' }}>
         <div className="card" style={{ padding: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span className="muted" style={{ fontWeight: 800, fontSize: 13.5 }}>Today&rsquo;s progress</span>
-            <span className="dim" style={{ fontWeight: 800, fontSize: 13 }}>{pct}%</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+            <div className="bar" style={{ flex: 1 }}><i style={{ width: pct + '%' }} /></div>
+            <span className="dim" style={{ fontWeight: 800, fontSize: 13, minWidth: 36, textAlign: 'right' }}>{pct}%</span>
           </div>
-          <div className="bar"><i style={{ width: pct + '%' }} /></div>
         </div>
       </div>
 

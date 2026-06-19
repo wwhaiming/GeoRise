@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import Icon from './Icon';
+import { HelpTip } from './UI';
 import api from '../utils/api';
 
 const CONF_STYLE = {
@@ -77,17 +78,19 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
   return (
     <div style={{ padding: '8px 16px 0' }}>
       <div className="card" style={{ padding: 16, border: '1px solid rgba(46,125,79,.18)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div className="eyebrow" style={{ color: 'var(--green)' }}>Direction B · your school's hidden footprint</div>
+            <div className="eyebrow" style={{ color: 'var(--green)' }}>School footprint</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
               <span style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 30, color: 'var(--green-d)', lineHeight: 1 }}>{t}t</span>
-              <span className="muted" style={{ fontSize: 12, fontWeight: 700 }}>CO₂e / month (est.)</span>
+              <span className="muted" style={{ fontSize: 12, fontWeight: 700 }}>CO₂e / mo</span>
             </div>
           </div>
-          <ConfChip level={fp.overallConfidence} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <ConfChip level={fp.overallConfidence} />
+            <HelpTip text={fp.disclaimer} />
+          </div>
         </div>
-        <div className="dim" style={{ fontSize: 11.5, fontWeight: 600, lineHeight: 1.35, marginTop: 6 }}>{fp.disclaimer}</div>
 
         {/* category bars — the hidden emitters, biggest first */}
         <div style={{ display: 'grid', gap: 9, marginTop: 14 }}>
@@ -95,7 +98,11 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
             <div key={c.category}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {i === 0 && <Icon name="flame" size={13} color="var(--coral)" />}{c.label}
+                  {i === 0 && (
+                    <span title="Biggest emitter — this category produces the most CO₂e of all your school's emission sources" style={{ display: 'flex', cursor: 'help' }}>
+                      <Icon name="flame" size={13} color="var(--coral)" />
+                    </span>
+                  )}{c.label}
                 </span>
                 <span className="tnum dim" title={`range ${c.low}–${c.high} kg/mo · ${c.factorName}`}>{Math.round(c.kgCO2ePerMonth).toLocaleString()} kg/mo</span>
               </div>
@@ -117,8 +124,8 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
           <div style={{ marginTop: 12, padding: 13, borderRadius: 13, background: 'var(--navy-800)', border: '1px solid rgba(45,91,57,.12)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
               <Icon name="sparkle" size={14} color="var(--green)" />
-              <span className="eyebrow" style={{ color: 'var(--green)' }}>Source-backed next step</span>
-              <span className="chip chip-dim" style={{ fontSize: 10, marginLeft: 'auto' }}>grounding {recommendation.faithfulness?.toFixed?.(2) ?? recommendation.faithfulness}</span>
+              <span className="eyebrow" style={{ color: 'var(--green)', flex: 1 }}>Next step</span>
+              <HelpTip text={`Source-backed recommendation. Grounding score: ${recommendation.faithfulness?.toFixed?.(2) ?? recommendation.faithfulness} (passes faithfulness gate).`} />
             </div>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14.5 }}>{recommendation.recommendation}</div>
             <div className="muted" style={{ fontSize: 12.5, fontWeight: 600, marginTop: 5, lineHeight: 1.4 }}>{recommendation.explanation}</div>
@@ -136,7 +143,7 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
 
         {/* baseline wizard — real inputs raise confidence */}
         <button className="btn btn-secondary btn-block btn-sm" style={{ marginTop: 12 }} onClick={() => setEditing(v => !v)}>
-          <Icon name="settings" size={14} /> {editing ? 'Close' : 'Enter real school data (raises confidence)'}
+          <Icon name="settings" size={14} /> {editing ? 'Close' : 'Update school data'}
         </button>
         {editing && (
           <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>

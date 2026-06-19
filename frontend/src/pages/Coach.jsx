@@ -7,7 +7,66 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Icon from '../components/Icon';
 import SchoolFootprint from '../components/SchoolFootprint';
+import { HelpTip } from '../components/UI';
 import api from '../utils/api';
+
+const CLIMATE_FACTS = [
+  'Transportation is ~29% of U.S. greenhouse-gas emissions — the single largest source.',
+  'One tree absorbs roughly 21 kg of CO₂ per year.',
+  'Producing 1 kg of beef emits ~60 kg of CO₂ — about 10× a plant-based meal.',
+  'A reusable bottle can prevent ~150 single-use plastic bottles a year.',
+  'Biking 10 miles instead of driving saves about 4 kg of CO₂.',
+  'Food waste causes ~8% of global greenhouse-gas emissions.',
+  'Air-drying one load of laundry saves ~1 kg of CO₂ vs. a dryer.',
+  'LED bulbs use ~75% less energy and last ~25× longer than incandescent.',
+  'Recycling one aluminum can saves enough energy to run a TV for ~3 hours.',
+  'Skipping meat one day a week ~= taking your car off the road for a month each year.',
+];
+
+const FACT_INTERVAL = 10000;
+
+function ClimateFact() {
+  const [i, setI] = useState(() => Math.floor(Math.random() * CLIMATE_FACTS.length));
+  const [progress, setProgress] = useState(0);
+  const startRef = useRef(Date.now());
+  const rafRef = useRef(null);
+
+  useEffect(() => {
+    const tick = () => {
+      const elapsed = Date.now() - startRef.current;
+      const pct = Math.min(elapsed / FACT_INTERVAL, 1);
+      setProgress(pct);
+      if (elapsed >= FACT_INTERVAL) {
+        setI(prev => (prev + 1) % CLIMATE_FACTS.length);
+        startRef.current = Date.now();
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const handleClick = () => {
+    setI(prev => (prev + 1) % CLIMATE_FACTS.length);
+    startRef.current = Date.now();
+    setProgress(0);
+  };
+
+  return (
+    <button onClick={handleClick} aria-label="Show another climate fact"
+      style={{ width: '100%', textAlign: 'left', cursor: 'pointer', border: '1px solid rgba(46,125,79,.18)', borderRadius: 18,
+        padding: '12px 14px', background: 'radial-gradient(180px 80px at 90% -10%, rgba(117,183,123,.14), transparent), var(--navy-800)',
+        display: 'flex', flexDirection: 'column', gap: 10, overflow: 'hidden', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, height: 3, width: '100%', background: 'rgba(46,125,79,.15)', borderRadius: '18px 18px 0 0', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${progress * 100}%`, background: 'var(--green)', transition: 'none', borderRadius: 'inherit' }} />
+      </div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <Icon name="leaf" size={18} color="var(--green)" style={{ flexShrink: 0 }} />
+        <div className="muted" style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: 'var(--text)', flex: 1 }}>{CLIMATE_FACTS[i]}</div>
+      </div>
+    </button>
+  );
+}
 
 function nowMs() {
   return Date.now();
@@ -89,11 +148,10 @@ function footprintFrom(posts = [], leaderboard) {
 function Banner() {
   return (
     <div style={{ padding: '8px 16px 0' }}>
-      <div className="card" style={{ padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', border: '1px solid rgba(46,125,79,.18)' }}>
-        <Icon name="sparkle" size={18} color="var(--green)" />
-        <span className="muted" style={{ fontSize: 12.5, fontWeight: 700, lineHeight: 1.35 }}>
-          AI drafts from trusted sources; EcoRise validates every citation and caps learning points so real-world action stays #1.
-        </span>
+      <div className="card" style={{ padding: '8px 14px', display: 'flex', gap: 10, alignItems: 'center', border: '1px solid rgba(46,125,79,.18)' }}>
+        <Icon name="sparkle" size={16} color="var(--green)" />
+        <span className="eyebrow" style={{ color: 'var(--green)', flex: 1 }}>AI-verified · capped points</span>
+        <HelpTip text="AI drafts answers from trusted sources. EcoRise validates every citation and caps learning points so real-world action stays #1." />
       </div>
     </div>
   );
@@ -109,20 +167,6 @@ function Metric({ label, value, sub }) {
   );
 }
 
-function FlowStep({ icon, title, body }) {
-  return (
-    <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', minWidth: 0 }}>
-      <span style={{ width: 30, height: 30, borderRadius: 10, background: 'rgba(46,125,79,.11)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon name={icon} size={16} color="var(--green)" />
-      </span>
-      <span style={{ minWidth: 0 }}>
-        <span style={{ display: 'block', fontWeight: 900, fontSize: 12.5, color: 'var(--text)', lineHeight: 1.15 }}>{title}</span>
-        <span className="muted" style={{ display: 'block', fontWeight: 650, fontSize: 11.5, lineHeight: 1.25, marginTop: 2 }}>{body}</span>
-      </span>
-    </div>
-  );
-}
-
 function CoachCommandCenter({ footprint, openLog }) {
   return (
     <div style={{ padding: '8px 16px 0' }}>
@@ -132,53 +176,44 @@ function CoachCommandCenter({ footprint, openLog }) {
         background: 'linear-gradient(145deg, rgba(255,255,255,.96), rgba(238,248,238,.92))',
         boxShadow: '0 18px 42px rgba(30,91,57,.12)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{
-            width: 48, height: 48, borderRadius: 16,
+            width: 44, height: 44, borderRadius: 14,
             background: 'linear-gradient(160deg,var(--green-2),var(--green))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 12px 24px rgba(46,125,79,.24)',
+            boxShadow: '0 10px 20px rgba(46,125,79,.22)',
             flexShrink: 0,
           }}>
-            <Icon name="sparkle" size={25} color="#fff" strokeWidth={2.5} />
+            <Icon name="sparkle" size={22} color="#fff" strokeWidth={2.5} />
           </span>
-          <div style={{ minWidth: 0 }}>
-            <div className="eyebrow" style={{ color: 'var(--green)' }}>Direction B · My School's Hidden Footprint</div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 26, lineHeight: 1.02, marginTop: 4 }}>
-              AI Footprint Coach
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 22, lineHeight: 1.05 }}>
+              Footprint Coach
             </div>
-            <div className="muted" style={{ fontSize: 13.5, fontWeight: 700, lineHeight: 1.4, marginTop: 7 }}>
-              For {footprint.boardName}, the coach connects local action logs with approved environmental research, then recommends what students should actually try next.
-            </div>
+            <div className="dim" style={{ fontSize: 12, fontWeight: 700 }}>{footprint.boardName}</div>
           </div>
+          <HelpTip text="The coach connects your board's action logs with approved research, then recommends what to try next. Input → AI reasoning → Insight → Action (with capped points)." />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 8, marginTop: 14 }}>
-          <Metric label="Local proof" value={footprint.verified} sub="verified actions" />
-          <Metric label="Impact logged" value={`${footprint.totalCo2.toFixed(1)}kg`} sub="CO2e saved" />
-          <Metric label="Top category" value={footprint.strongest.category} sub="leading" />
+          <Metric label="Verified" value={footprint.verified} sub="actions" />
+          <Metric label="Impact" value={`${footprint.totalCo2.toFixed(1)}kg`} sub="CO₂e saved" />
+          <Metric label="Leading" value={footprint.strongest.category} sub="category" />
         </div>
 
         <div style={{ marginTop: 14, padding: 13, borderRadius: 16, background: 'rgba(46,125,79,.08)', border: '1px solid rgba(46,125,79,.13)' }}>
-          <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 5 }}>Priority AI insight</div>
-          <div style={{ fontFamily: 'var(--display)', fontSize: 17, fontWeight: 650, lineHeight: 1.22 }}>
+          <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 5 }}>Insight</div>
+          <div style={{ fontFamily: 'var(--display)', fontSize: 16, fontWeight: 650, lineHeight: 1.22 }}>
             {footprint.hasLocalData
-              ? `Your board is strongest in ${footprint.strongest.category}, but ${footprint.weakest.category} is underrepresented.`
-              : 'No local evidence yet. Start with a transport audit because school arrival habits are visible, measurable, and easy to verify.'}
+              ? `Strongest: ${footprint.strongest.category} · gap: ${footprint.weakest.category}`
+              : 'No local data yet — start with a transport audit.'}
           </div>
           <div className="muted" style={{ fontSize: 13, fontWeight: 650, lineHeight: 1.38, marginTop: 6 }}>
             {footprint.recommendation}
           </div>
           <button className="btn btn-primary btn-block btn-sm" style={{ marginTop: 12 }} onClick={openLog}>
-            <Icon name="camera" size={16} /> Log recommended action
+            <Icon name="camera" size={16} /> Log action
           </button>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 18, rowGap: 16, marginTop: 18 }}>
-          <FlowStep icon="camera" title="Input" body="school posts, board stats, action photos" />
-          <FlowStep icon="sparkle" title="AI reasoning" body="retrieval, pattern finding, recommendation" />
-          <FlowStep icon="leaf" title="Insight" body="cited question, gap, practical next step" />
-          <FlowStep icon="check" title="Action" body="human-visible proof and capped points" />
         </div>
       </div>
     </div>
@@ -243,13 +278,14 @@ export default function Coach({ ctx }) {
           <Icon name="sparkle" size={22} color="var(--green)" />
         </span>
         <div style={{ flex: 1 }}>
-          <div className="eyebrow" style={{ color: 'var(--green)' }}>AI-first workspace</div>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 19, lineHeight: 1 }}>School footprint coach</div>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 19, lineHeight: 1 }}>Coach</div>
         </div>
-        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back home" onClick={() => go('home')}>
+        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back" onClick={() => go('leaderboard')}>
           <Icon name="home" size={18} />
         </button>
       </div>
+
+      <div style={{ padding: '8px 16px 0' }}><ClimateFact /></div>
 
       <SchoolFootprint leaderboardId={leaderboardId} showToast={showToast} />
 
@@ -275,7 +311,7 @@ export default function Coach({ ctx }) {
 
           {/* question / result */}
           <div style={{ padding: '14px 16px 0' }}>
-            <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 6 }}>Source-backed question</div>
+            <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 6 }}>Question</div>
             {noCorpus ? (
               <div className="card" style={{ padding: 16 }}>
                 <div className="muted" style={{ fontSize: 13.5, fontWeight: 600 }}>No approved learning sources yet — ask a teacher/admin to add and approve sources.</div>
@@ -338,7 +374,7 @@ export default function Coach({ ctx }) {
           {/* guidance */}
           {guidance && (
             <div style={{ padding: '16px 16px 0' }}>
-              <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 6 }}>Research-grounded next action</div>
+              <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 6 }}>Next action</div>
               <div className="card" style={{ padding: 16 }}>
                 <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5 }}>{guidance.recommendation}</div>
                 <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>{guidance.explanation}</div>
@@ -350,14 +386,12 @@ export default function Coach({ ctx }) {
             </div>
           )}
 
-          {/* refusal card: the coach declines rather than guess (responsible-AI made visible) */}
+          {/* refusal card */}
           {!guidance && guidanceError && (
             <div style={{ padding: '16px 16px 0' }}>
-              <div className="card" style={{ padding: 14, border: '1px solid rgba(182,111,77,.22)' }}>
-                <div className="eyebrow" style={{ color: 'var(--coral-d)', marginBottom: 4 }}>Guidance withheld</div>
-                <div className="muted" style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.4 }}>
-                  The coach declined to generate a recommendation it couldn&rsquo;t ground in approved sources (or the model was unreachable). It refuses rather than guess.
-                </div>
+              <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid rgba(182,111,77,.22)' }}>
+                <div className="eyebrow" style={{ color: 'var(--coral-d)', flex: 1 }}>Guidance withheld</div>
+                <HelpTip text="The coach declined to generate a recommendation it couldn't ground in approved sources, or the model was unreachable. It refuses rather than guess." />
               </div>
             </div>
           )}
@@ -365,7 +399,6 @@ export default function Coach({ ctx }) {
           {/* daily tip */}
           {tip && (
             <div style={{ padding: '16px 16px 0' }}>
-              <div className="eyebrow" style={{ color: 'var(--text-dim)', marginBottom: 6 }}>Daily micro-coach notification</div>
               <div className="card" style={{ padding: 14 }}>
                 <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.45 }}>{tip.body}</div>
                 <Sources sources={tip.sources} />

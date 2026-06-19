@@ -4,7 +4,7 @@ import Icon from './Icon';
 const NAV = [
   { key: 'coach', label: 'AI', ariaLabel: 'AI Eco Coach', icon: 'sparkle' },
   { key: 'research', label: 'Research', ariaLabel: 'Research library', icon: 'folder' },
-  { key: 'home', label: 'Board', icon: 'home' },
+  { key: 'leaderboard', label: 'Board', icon: 'home' },
   { key: 'quests', label: 'Quests', icon: 'bolt' },
   { key: 'feed', label: 'Feed', icon: 'feed' },
   { key: 'profile', label: 'Profile', icon: 'user' },

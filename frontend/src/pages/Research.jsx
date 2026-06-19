@@ -6,6 +6,7 @@
  */
 import { useState, useEffect } from 'react';
 import Icon from '../components/Icon';
+import { HelpTip } from '../components/UI';
 import ResearchLibrary from '../components/ResearchLibrary';
 import api from '../utils/api';
 
@@ -38,7 +39,7 @@ function AIReportCard() {
           <span className="eyebrow" style={{ color: 'var(--green)' }}>AI report card</span>
           <span className="chip" style={{ marginLeft: 'auto', fontSize: 10, background: rep.pass ? 'rgba(46,125,79,.14)' : 'rgba(182,111,77,.16)', color: rep.pass ? 'var(--green-d)' : 'var(--coral-d)' }}>{rep.pass ? 'all gates pass' : 'gate fail'}</span>
         </div>
-        <div className="dim" style={{ fontSize: 11, fontWeight: 650, marginBottom: 10 }}>Live output of the responsible-AI eval harness — not hardcoded.</div>
+        <div style={{ marginBottom: 10 }}><HelpTip text="Live output of the responsible-AI eval harness — not hardcoded." /></div>
         <div style={{ display: 'grid', gap: 7 }}>
           {rows.map(([k, v]) => (
             <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, fontWeight: 700 }}>
@@ -62,10 +63,9 @@ export default function Research({ ctx }) {
           <Icon name="folder" size={22} color="var(--green)" />
         </span>
         <div style={{ flex: 1 }}>
-          <div className="eyebrow" style={{ color: 'var(--green)' }}>AI · grounded in research</div>
-          <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 19, lineHeight: 1 }}>Research library</div>
+          <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 19, lineHeight: 1 }}>Research</div>
         </div>
-        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back home" onClick={() => go('home')}>
+        <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back" onClick={() => go('leaderboard')}>
           <Icon name="home" size={18} />
         </button>
       </div>
@@ -75,11 +75,9 @@ export default function Research({ ctx }) {
       <AIReportCard />
 
       <div style={{ padding: '16px 16px 0' }}>
-        <div className="card" style={{ padding: 15, border: '1px solid rgba(182,111,77,.22)' }}>
-          <div className="eyebrow" style={{ color: 'var(--coral-d)', marginBottom: 6 }}>Responsible AI guardrails</div>
-          <div className="muted" style={{ fontSize: 13, fontWeight: 650, lineHeight: 1.45 }}>
-            The coach cannot award unlimited points or invent sources. Learning points are capped, citations are shown, impact math stays deterministic, and organizers keep human review over boards, source approval, and moderation.
-          </div>
+        <div className="card" style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid rgba(182,111,77,.22)' }}>
+          <span className="eyebrow" style={{ color: 'var(--coral-d)', flex: 1 }}>Responsible AI guardrails</span>
+          <HelpTip text="The coach cannot award unlimited points or invent sources. Learning points are capped, citations are shown, impact math stays deterministic, and organizers keep human review over boards, source approval, and moderation." />
         </div>
       </div>
 

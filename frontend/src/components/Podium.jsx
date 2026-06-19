@@ -71,7 +71,7 @@ function PodiumStand({ top3, bump, metric }) {
         const r = ranks[i], m = METAL[r], first = r === 1;
         const key = p ? (p.user_id || p.id || `pos-${r}`) : `empty-${r}`;
         return (
-          <div key={key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: `risePodium .6s cubic-bezier(.2,.8,.2,1) ${i * .12}s both`, opacity: p ? 1 : 0.5 }}>
+          <div key={key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', animation: `risePodium .6s cubic-bezier(.2,.8,.2,1) ${i * .12}s both`, opacity: p ? 1 : 0.75 }}>
             <div className={p && bump === (p.user_id || p.id) ? 'pop-in' : ''} style={{ position: 'relative', marginBottom: 10 }}>
               {first && p && <div style={{ position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)', fontSize: 26 }}>👑</div>}
               {p ? (
@@ -93,10 +93,10 @@ function PodiumStand({ top3, bump, metric }) {
             </div>
             <div style={{
               width: '100%', height: heights[r], position: 'relative', borderRadius: '8px 8px 0 0', overflow: 'hidden',
-              background: p ? `linear-gradient(180deg, ${m.a}, ${m.b})` : 'linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02))',
-              border: p ? 'none' : '1px dashed rgba(255,255,255,.12)',
+              background: p ? `linear-gradient(180deg, ${m.a}, ${m.b})` : `linear-gradient(180deg, ${m.a}30, ${m.b}18)`,
+              border: p ? 'none' : `1.5px dashed ${m.a}55`,
               borderBottom: 'none',
-              boxShadow: p ? `0 -6px 26px ${m.glow}, inset 0 2px 0 rgba(255,255,255,.5)` : 'none',
+              boxShadow: p ? `0 -6px 26px ${m.glow}, inset 0 2px 0 rgba(255,255,255,.5)` : `inset 0 2px 0 ${m.a}22`,
             }}>
               {p && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(255,255,255,.25), transparent 30%)' }} />}
               <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', fontFamily: 'var(--display)', fontWeight: 700, fontSize: first ? 40 : 30, color: p ? m.ink : 'rgba(255,255,255,.1)', opacity: p ? 0.9 : 0.3 }}>{r}</div>

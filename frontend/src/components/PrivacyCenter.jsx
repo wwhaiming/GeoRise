@@ -218,50 +218,43 @@ export default function PrivacyCenter({ ctx }) {
                 <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>No members found on this board.</div>
               ) : vault.map(m => (
                 <div key={m.user_id} style={{ padding: 12, borderRadius: 12, background: 'var(--navy-800)', border: '1px solid rgba(45,91,57,.10)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>
-                        {m.name} <span className="muted" style={{ fontSize: 11.5 }}>({m.role})</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center' }}>
-                        <span className="chip" style={{
-                          fontSize: 10.5,
-                          background: m.consent_status === 'granted' ? 'rgba(46,125,79,.14)' :
-                                      m.consent_status === 'attested' ? 'rgba(46,125,79,.08)' :
-                                      'rgba(182,111,77,.16)',
-                          color: m.consent_status === 'granted' || m.consent_status === 'attested' ? 'var(--green-d)' : 'var(--coral-d)'
-                        }}>
-                          {m.consent_status === 'granted' ? 'Parent Granted' :
-                           m.consent_status === 'attested' ? 'Teacher Attested' : 'Needs Consent'}
-                        </span>
-                        {m.has_document ? (
-                          <button onClick={() => downloadDocument(m.user_id, m.document_name)} className="btn-link" style={{ fontSize: 11, color: 'var(--green)', background: 'none', border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
-                            📄 {m.document_name || 'View Slip'}
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: 11, color: 'var(--coral-d)' }}>⚠️ No slip uploaded</span>
-                        )}
-                      </div>
-                    </div>
-                    {/* Actions */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => updateMemberConsent(m.user_id, 'granted')}>Grant Parent</button>
-                        <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => updateMemberConsent(m.user_id, 'attested')}>Attest Class</button>
-                        {m.consent_status !== 'none' && m.consent_status !== 'revoked' && (
-                          <button className="btn btn-sm" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--coral-d)', background: 'rgba(182,111,77,.10)' }} onClick={() => updateMemberConsent(m.user_id, 'revoked')}>Revoke</button>
-                        )}
-                      </div>
-                      <label className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '4px 8px', fontSize: 11, margin: 0 }}>
-                        <Icon name="share" size={11} /> Upload Slip
-                        <input
-                          type="file"
-                          accept=".pdf,image/jpeg,image/png,image/webp"
-                          style={{ display: 'none' }}
-                          onChange={(e) => handleDocumentUpload(m.user_id, m.consent_status === 'granted' ? 'granted' : 'attested', e.target.files[0])}
-                        />
-                      </label>
-                    </div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {m.name} <span className="muted" style={{ fontSize: 11.5 }}>({m.role})</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span className="chip" style={{
+                      fontSize: 10.5,
+                      background: m.consent_status === 'granted' ? 'rgba(46,125,79,.14)' :
+                                  m.consent_status === 'attested' ? 'rgba(46,125,79,.08)' :
+                                  'rgba(182,111,77,.16)',
+                      color: m.consent_status === 'granted' || m.consent_status === 'attested' ? 'var(--green-d)' : 'var(--coral-d)'
+                    }}>
+                      {m.consent_status === 'granted' ? 'Parent Granted' :
+                       m.consent_status === 'attested' ? 'Teacher Attested' : 'Needs Consent'}
+                    </span>
+                    {m.has_document ? (
+                      <button onClick={() => downloadDocument(m.user_id, m.document_name)} className="btn-link" style={{ fontSize: 11, color: 'var(--green)', background: 'none', border: 'none', padding: 0, textDecoration: 'underline', cursor: 'pointer' }}>
+                        📄 {m.document_name || 'View Slip'}
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: 11, color: 'var(--coral-d)' }}>⚠️ No slip uploaded</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                    <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => updateMemberConsent(m.user_id, 'granted')}>Grant Parent</button>
+                    <button className="btn btn-secondary btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => updateMemberConsent(m.user_id, 'attested')}>Attest Class</button>
+                    {m.consent_status !== 'none' && m.consent_status !== 'revoked' && (
+                      <button className="btn btn-sm" style={{ padding: '4px 8px', fontSize: 11, color: 'var(--coral-d)', background: 'rgba(182,111,77,.10)' }} onClick={() => updateMemberConsent(m.user_id, 'revoked')}>Revoke</button>
+                    )}
+                    <label className="btn btn-secondary btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', padding: '4px 8px', fontSize: 11, margin: 0 }}>
+                      <Icon name="share" size={11} /> Upload Slip
+                      <input
+                        type="file"
+                        accept=".pdf,image/jpeg,image/png,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleDocumentUpload(m.user_id, m.consent_status === 'granted' ? 'granted' : 'attested', e.target.files[0])}
+                      />
+                    </label>
                   </div>
                 </div>
               ))}
