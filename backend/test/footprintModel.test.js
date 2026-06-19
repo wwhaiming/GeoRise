@@ -9,15 +9,14 @@ test('estimate is deterministic for the same input', () => {
   assert.deepStrictEqual(a, b);
 });
 
-test('defaults produce all six categories, sorted desc, total = sum, low confidence', () => {
+test('no real inputs => 5 environmental categories, all zero (Named School Mode), no food', () => {
   const f = estimateFootprint({});
-  assert.strictEqual(f.categories.length, 6);
+  assert.strictEqual(f.categories.length, 5);                 // env-only: food category removed
+  assert.ok(f.categories.every(c => !/food|cafeteria/i.test(c.label)), 'no food/cafeteria category');
   assert.strictEqual(f.isEstimate, true);
-  assert.strictEqual(f.overallConfidence, 'low');           // no provided inputs
-  // sorted descending by kg/mo
-  for (let i = 1; i < f.categories.length; i++) {
-    assert.ok(f.categories[i - 1].kgCO2ePerMonth >= f.categories[i].kgCO2ePerMonth, 'categories must be sorted desc');
-  }
+  assert.strictEqual(f.overallConfidence, 'low');             // no provided inputs
+  assert.strictEqual(f.totalKgPerMonth, 0, 'shows 0 until real data is entered');
+  assert.ok(f.categories.every(c => c.kgCO2ePerMonth === 0), 'every default category is zero');
   assert.strictEqual(f.biggestEmitter, f.categories[0]);
   const sum = f.categories.reduce((s, c) => s + c.kgCO2ePerMonth, 0);
   assert.ok(Math.abs(sum - f.totalKgPerMonth) < 0.5, 'total must equal the category sum');
@@ -36,7 +35,7 @@ test('every category carries honest metadata: confidence, assumptions, a valid b
 test('provided real inputs are flagged and lift overall confidence to medium', () => {
   const def = estimateFootprint({ students: 800 });
   assert.strictEqual(def.categories.filter(c => c.provided).length, 0);
-  const real = estimateFootprint({ students: 800, monthlyKwh: 60000, monthlyGasTherms: 1200, dailyMealsServed: 600, landfillBagsPerWeek: 40 });
+  const real = estimateFootprint({ students: 800, monthlyKwh: 60000, monthlyGasTherms: 1200, landfillBagsPerWeek: 40, monthlyWaterM3: 120 });
   assert.strictEqual(real.categories.filter(c => c.provided).length, 4);
   assert.strictEqual(real.overallConfidence, 'medium');     // >=4 provided
 });
@@ -51,7 +50,7 @@ test('more electricity raises the electricity estimate (monotonic in input)', ()
 });
 
 test('actionLeverage computes ratio vs the biggest emitter', () => {
-  const f = estimateFootprint({ students: 800 });
+  const f = estimateFootprint({ students: 800, monthlyKwh: 90000 }); // real input so emitter is non-zero
   const top = f.biggestEmitter;
   const weekly = top.kgCO2ePerMonth / 4.33;
   const lev = actionLeverage(weekly / 2, f, 'week');  // saved = half the weekly emitter

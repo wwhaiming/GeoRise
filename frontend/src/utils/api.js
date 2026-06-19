@@ -91,6 +91,11 @@ export const api = {
   coachSchoolInsight: (leaderboardId) => apiFetch(`/api/coach/school-insight${leaderboardId ? `?leaderboardId=${encodeURIComponent(leaderboardId)}` : ''}`),
   coachSetFootprint: (body) => apiFetch('/api/coach/school-footprint', { method: 'POST', body: JSON.stringify(body) }),
 
+  // AI Insights (Direction B reasoning layer: anomaly + forecast + recommendation -> approved action)
+  coachInsights: (leaderboardId) => apiFetch(`/api/coach/insights${leaderboardId ? `?leaderboardId=${encodeURIComponent(leaderboardId)}` : ''}`),
+  coachInsightsLoadDemo: (leaderboardId) => apiFetch('/api/coach/insights/load-demo', { method: 'POST', body: JSON.stringify({ leaderboardId }) }),
+  coachInsightsApprove: (leaderboardId, itemKey) => apiFetch('/api/coach/insights/approve', { method: 'POST', body: JSON.stringify({ leaderboardId, itemKey }) }),
+
   // Privacy / FERPA-COPPA (Phase 2)
   privacyPolicy: () => apiFetch('/api/privacy/policy'),
   getConsent: (leaderboardId) => apiFetch(`/api/privacy/consent?leaderboardId=${encodeURIComponent(leaderboardId)}`),

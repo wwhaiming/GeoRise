@@ -1,0 +1,119 @@
+/* EcoRise — Direction B AI reasoning layer tests: anomaly + forecast + recommendation
+ * engines (pure) and the /api/coach/insights endpoints (integration via supertest). */
+process.env.JWT_SECRET = process.env.JWT_SECRET || ('insights-test-secret-' + 'x'.repeat(24));
+process.env.COACH_ENABLED = 'true';
+process.env.NODE_ENV = 'test';
+
+const test = require('node:test');
+const assert = require('node:assert');
+const request = require('supertest');
+
+const { detectAnomalies, ols } = require('../utils/anomalyEngine');
+const { forecastNextMonth } = require('../utils/forecastEngine');
+const { recommend } = require('../utils/interventionModel');
+const { estimateFootprint } = require('../utils/footprintModel');
+const LINCOLN = require('../data/lincolnHigh');
+
+// ── Engine unit tests (pure, deterministic) ──────────────────────────────────
+test('ols recovers known linear coefficients exactly', () => {
+  const X = [[1, 1, 1], [1, 2, 1], [1, 1, 2], [1, 3, 2], [1, 2, 3], [1, 4, 1], [1, 1, 4]];
+  const y = X.map(r => 5 + 2 * r[1] + 3 * r[2]);
+  const b = ols(X, y).map(v => Math.round(v * 100) / 100);
+  assert.deepStrictEqual(b, [5, 2, 3]);
+});
+
+test('detectAnomalies flags a planted gas spike, attributes it to heating, requires human review', () => {
+  const an = detectAnomalies(LINCOLN.series, { zThresh: 2 });
+  assert.ok(an.length >= 1, 'should flag at least one anomaly in the seeded data');
+  const gas = an.find(a => a.category === 'gas' && a.month === '2026-01');
+  assert.ok(gas, 'should flag the planted Jan-2026 gas spike');
+  assert.ok(gas.percentAboveExpected > 5, 'spike is meaningfully above expected');
+  assert.strictEqual(gas.requiresHumanReview, true);
+  assert.ok(gas.excessKgCO2ePerMonth > 0 && gas.source, 'excess kg + cited factor present');
+  assert.ok(/boiler|weekend|heating/i.test(gas.likelyCauses.join(' ')));
+});
+
+test('detectAnomalies returns nothing on clean (on-model) data and never flags savings', () => {
+  // perfectly-on-model gas: usage = 50 + 4*schoolDays + 1.1*hdd, varying predictors
+  const sd = [20, 18, 21, 19, 16, 22, 15, 17, 20, 21, 19, 18];
+  const hdd = [120, 300, 420, 380, 210, 60, 520, 460, 90, 260, 410, 180];
+  const series = sd.map((d, i) => ({ month: 'M' + i, schoolDays: d, hdd: hdd[i], cdd: 50, gasTherms: 50 + 4 * d + 1.1 * hdd[i] }));
+  const an = detectAnomalies(series, { zThresh: 2 });
+  assert.strictEqual(an.length, 0, 'no anomalies on clean data');
+  // a month FAR BELOW expected (savings) must not be flagged as waste
+  series[5].gasTherms = Math.round(series[5].gasTherms * 0.5);
+  assert.strictEqual(detectAnomalies(series, { zThresh: 2 }).filter(a => a.month === 'M5').length, 0);
+});
+
+test('forecastNextMonth returns a valid 80% band (low <= predicted <= high, non-negative)', () => {
+  const fc = forecastNextMonth(LINCOLN.series, LINCOLN.upcoming);
+  assert.ok(fc.gas && fc.electricity && fc.water, 'forecasts all three utilities');
+  for (const k of ['gas', 'electricity', 'water']) {
+    const f = fc[k];
+    assert.ok(f.low >= 0 && f.low <= f.predicted + 1e-6 && f.predicted <= f.high + 1e-6, `band must bracket ${k}`);
+    assert.ok(f.predictedKgCO2e >= 0 && f.unit, `${k} carries kg + unit`);
+  }
+});
+
+test('recommend ranks env interventions, boosts anomaly-addressing ones, all require approval', () => {
+  const fp = estimateFootprint(LINCOLN.baseline);
+  const an = detectAnomalies(LINCOLN.series, { zThresh: 2 });
+  const recs = recommend(fp, an, { budget: 'any', maxItems: 3 });
+  assert.strictEqual(recs.length, 3);
+  assert.ok(recs.every(r => r.requiresApproval === true && r.approver), 'human approver on every rec');
+  // gas anomaly present -> a gas/HVAC intervention should rank #1
+  assert.ok(['hvac_setback', 'boiler_weekend_zones'].includes(recs[0].key), 'anomaly-addressing rec ranks first');
+  assert.ok(recs.every(r => !/food|cafeteria|meal/i.test(JSON.stringify(r))), 'no food interventions');
+});
+
+test('recommend with budget=none excludes capital projects (LED retrofit)', () => {
+  const fp = estimateFootprint(LINCOLN.baseline);
+  const recs = recommend(fp, [], { budget: 'none', maxItems: 10 });
+  assert.ok(recs.every(r => r.costTier === 'none'), 'only no-cost actions when budget=none');
+  assert.ok(!recs.find(r => r.key === 'led_retrofit'), 'capital LED retrofit excluded');
+});
+
+// ── Endpoint integration tests ───────────────────────────────────────────────
+const app = require('../server');
+async function signup(email, name) {
+  const r = await request(app).post('/api/auth/signup').send({ email, password: 'password12', name });
+  const cookie = r.headers['set-cookie'];
+  const csrf = (cookie.find(c => c.startsWith('csrf=')) || '').split('=')[1].split(';')[0];
+  return { cookie, csrf };
+}
+
+test('GET /insights returns the Lincoln High sample when a board has no data', async () => {
+  const t = await signup('ins-teacher@t.co', 'Teacher');
+  const r = await request(app).get('/api/coach/insights').set('Cookie', t.cookie);
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.sampleData, true);
+  assert.strictEqual(r.body.school, 'Lincoln High School');
+  assert.ok(r.body.anomalies.length >= 1 && r.body.recommendations.length >= 1);
+  assert.ok(typeof r.body.summary === 'string' && r.body.summary.length > 0);
+  assert.ok(/never changes building settings|approve/i.test(r.body.humanInLoop));
+});
+
+test('load-demo + approve: human-in-the-loop action plan, audit-logged, authz enforced', async () => {
+  const t = await signup('ins-org@t.co', 'Organizer');
+  const board = await request(app).post('/api/leaderboards').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ name: 'Lincoln' });
+  const lb = board.body.id;
+  const ld = await request(app).post('/api/coach/insights/load-demo').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb });
+  assert.strictEqual(ld.status, 200);
+  const ins = await request(app).get('/api/coach/insights?leaderboardId=' + lb).set('Cookie', t.cookie);
+  assert.strictEqual(ins.body.sampleData, false, 'now using the board loaded data');
+  const key = ins.body.recommendations[0].key;
+  const ap = await request(app).post('/api/coach/insights/approve').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key });
+  assert.strictEqual(ap.status, 200);
+  assert.strictEqual(ap.body.status, 'approved');
+  assert.ok(ap.body.verifyBy && ap.body.expectedKgPerMonth >= 0);
+  // approval persists into the next insights read
+  const ins2 = await request(app).get('/api/coach/insights?leaderboardId=' + lb).set('Cookie', t.cookie);
+  assert.strictEqual(ins2.body.recommendations.find(r => r.key === key).status, 'approved');
+  // unknown item key -> 404
+  const bad = await request(app).post('/api/coach/insights/approve').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: 'nope' });
+  assert.strictEqual(bad.status, 404);
+  // a non-member cannot approve (AI never auto-approves; only the human organizer can)
+  const s = await signup('ins-stranger@t.co', 'Stranger');
+  const blocked = await request(app).post('/api/coach/insights/approve').set('Cookie', s.cookie).set('x-csrf-token', s.csrf).send({ leaderboardId: lb, itemKey: key });
+  assert.strictEqual(blocked.status, 403);
+});

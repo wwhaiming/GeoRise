@@ -53,9 +53,11 @@ const FACTORS = {
   },
 };
 
+// Environmental categories only (Direction B). Food consumption is intentionally excluded
+// to stay out of Direction A (food-waste) territory.
 const CATEGORY_LABELS = {
   electricity: 'Electricity', natural_gas: 'Heating (natural gas)', commuting: 'Student/staff commuting',
-  cafeteria_food: 'Cafeteria food', landfill_waste: 'Landfill waste', water: 'Water',
+  landfill_waste: 'Landfill waste', water: 'Water',
 };
 
 const WEEKS_PER_MONTH = 4.33;
@@ -109,13 +111,6 @@ function estimateFootprint(baseline = {}) {
     [`Bus ${round(busMiles)} mi/wk + ~${Math.round(carShare * 100)}% of ${students} students driven ~8 mi round-trip`, 'Bus per-passenger allocation simplified to vehicle-mile factor'],
     (has(baseline.busMilesPerWeek) || has(baseline.pctDrivenStudents)));
 
-  // Cafeteria food: meals/day if given, else 1 meal/student/day.
-  const mealsDay = Number.isFinite(+baseline.dailyMealsServed) ? +baseline.dailyMealsServed : students;
-  const mealsMonth = mealsDay * SCHOOL_DAYS_PER_MONTH;
-  push('cafeteria_food', mealsMonth * FACTORS.school_meal.value, FACTORS.school_meal,
-    has(baseline.dailyMealsServed) ? 'medium' : 'low',
-    [has(baseline.dailyMealsServed) ? `Provided ${mealsDay} meals/day` : `Default 1 meal/student/day × ${students}`, 'Per-meal factor is a coarse mixed-diet average; menu mix dominates'],
-    has(baseline.dailyMealsServed));
 
   // Landfill waste: bags/week → ~5 kg/bag default mass.
   const bags = Number.isFinite(+baseline.landfillBagsPerWeek) ? +baseline.landfillBagsPerWeek : Math.ceil(students / 25);
@@ -133,8 +128,10 @@ function estimateFootprint(baseline = {}) {
     has(baseline.monthlyWaterM3));
 
   cats.sort((a, b) => b.kgCO2ePerMonth - a.kgCO2ePerMonth);
-  const totalKgPerMonth = round(cats.reduce((s, c) => s + c.kgCO2ePerMonth, 0));
   const providedCount = cats.filter(c => c.provided).length;
+  // Show 0 until real school data is entered — do not display fabricated default estimates.
+  if (providedCount === 0) cats.forEach(c => { c.kgCO2ePerMonth = 0; c.low = 0; c.high = 0; });
+  const totalKgPerMonth = round(cats.reduce((s, c) => s + c.kgCO2ePerMonth, 0));
   return {
     students,
     totalKgPerMonth,

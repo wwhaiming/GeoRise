@@ -19,6 +19,11 @@ const { computeGrant } = require('../utils/coachScoring');
 const { generateCoachQuestion, generateCoachGuidance, answerFromSources, summarizePaper, paperVisual } = require('../utils/aiClient');
 const { estimateFootprint, actionLeverage } = require('../utils/footprintModel');
 const { awardPoints } = require('../utils/pointsEngine');
+const { detectAnomalies } = require('../utils/anomalyEngine');
+const { forecastNextMonth } = require('../utils/forecastEngine');
+const { recommend } = require('../utils/interventionModel');
+const { auditLog } = require('../utils/privacy');
+const LINCOLN = require('../data/lincolnHigh');
 const fs = require('fs');
 const path = require('path');
 const EVAL_RESULTS = path.join(__dirname, '..', 'test', 'coach_eval', 'results.json');
@@ -561,6 +566,109 @@ function upsertPrefs(db, userId, p) {
 function str(v) { return typeof v === 'string' ? v : ''; }
 function safeTags(t) { return safeJsonArr(t); }
 function safeJsonArr(t) { try { const a = JSON.parse(t); return Array.isArray(a) ? a : []; } catch { return []; } }
+
+// ── Direction B: AI INSIGHTS (anomaly detection + forecast + recommendation) ──
+// The reasoning layer over a school's own utility history: input -> AI -> insight -> action.
+// Falls back to the named "Lincoln High" sample when a board has not entered real data, so
+// the local, specific demo always works. Environmental scope only (no food/cafeteria).
+function ensureInsightTables(db) {
+  db.prepare("CREATE TABLE IF NOT EXISTS school_utility (leaderboard_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))").run();
+  db.prepare("CREATE TABLE IF NOT EXISTS action_plan_items (leaderboard_id TEXT NOT NULL, item_key TEXT NOT NULL, status TEXT DEFAULT 'proposed', approved_by TEXT, approved_at TEXT, expected_kg REAL, verify_by TEXT, payload TEXT, PRIMARY KEY (leaderboard_id, item_key))").run();
+}
+function loadUtilitySeries(db, lb) {
+  if (lb) {
+    const row = db.prepare('SELECT data FROM school_utility WHERE leaderboard_id = ?').get(lb);
+    if (row) { try { const s = JSON.parse(row.data); if (Array.isArray(s) && s.length) return { series: s, sample: false }; } catch { /* fall through */ } }
+  }
+  return { series: LINCOLN.series, sample: true };
+}
+function loadBaseline(db, lb) {
+  if (lb) { const row = db.prepare('SELECT data FROM school_baselines WHERE leaderboard_id = ?').get(lb); if (row) { try { return JSON.parse(row.data) || {}; } catch { /* ignore */ } } }
+  return {};
+}
+// Deterministic plain-language summary (works offline; no LLM needed).
+function summarizeInsights(school, anomalies, recs) {
+  const parts = [];
+  if (anomalies.length) {
+    const a = anomalies[0];
+    const what = a.category === 'gas' ? 'heating gas' : a.category === 'electricity' ? 'electricity' : 'water';
+    parts.push(`At ${school}, ${what} use in ${a.month} ran ~${a.percentAboveExpected}% above the weather-and-occupancy baseline (~${a.excessKgCO2ePerMonth} kg CO2e of likely-avoidable emissions).`);
+  } else {
+    parts.push(`At ${school}, utility use is within the expected weather-and-occupancy baseline — no anomalies above threshold.`);
+  }
+  if (recs.length) {
+    const r = recs[0];
+    parts.push(`Highest-leverage next step: ${r.label.toLowerCase()} (~${r.expectedKgPerMonth} kg CO2e/month, ${r.costTier === 'none' ? 'no cost' : r.costTier + ' cost'}), pending ${r.approver} approval.`);
+  }
+  return parts.join(' ');
+}
+
+router.get('/insights', authMiddleware, (req, res) => {
+  try {
+    const db = getDb();
+    ensureFootprintTable(db); ensureInsightTables(db);
+    const lb = boardForUser(db, req);
+    const { series, sample } = loadUtilitySeries(db, lb);
+    let baseline = loadBaseline(db, lb);
+    if (sample && !Object.keys(baseline).length) baseline = LINCOLN.baseline;
+    const footprint = estimateFootprint(baseline);
+    const anomalies = detectAnomalies(series, { zThresh: 2 });
+    const upcoming = sample ? LINCOLN.upcoming : (series[series.length - 1] || {});
+    const forecast = forecastNextMonth(series, upcoming);
+    const recs = recommend(footprint, anomalies, { budget: 'any', maxItems: 3 });
+    const approvals = lb ? db.prepare('SELECT item_key, status, approved_at, verify_by, expected_kg FROM action_plan_items WHERE leaderboard_id = ?').all(lb) : [];
+    const aMap = Object.fromEntries(approvals.map(a => [a.item_key, a]));
+    const recommendations = recs.map(r => ({ ...r, status: aMap[r.key] ? aMap[r.key].status : 'proposed', approvedAt: aMap[r.key] ? aMap[r.key].approved_at : null, verifyBy: aMap[r.key] ? aMap[r.key].verify_by : null }));
+    const school = sample ? LINCOLN.profile.name : ((db.prepare('SELECT name FROM leaderboards WHERE id = ?').get(lb) || {}).name || 'your school');
+    res.json({
+      school, sampleData: sample, profile: sample ? LINCOLN.profile : null,
+      anomalies, forecast, recommendations,
+      footprint: { biggestEmitter: footprint.biggestEmitter, totalKgPerMonth: footprint.totalKgPerMonth, overallConfidence: footprint.overallConfidence },
+      summary: summarizeInsights(school, anomalies, recommendations),
+      humanInLoop: 'AI flags anomalies and ranks interventions; a human (facilities/teacher) approves any action. The AI never changes building settings or assigns blame.',
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) { console.error('coach /insights error:', err.message); res.status(500).json({ error: 'Internal server error' }); }
+});
+
+// Load the named-school demo (Lincoln High) onto a board — organizer only.
+router.post('/insights/load-demo', authMiddleware, (req, res) => {
+  try {
+    const db = getDb();
+    const lb = boardForUser(db, req);
+    if (!lb) return res.status(403).json({ error: 'Join or organize this board to load demo data.' });
+    if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) return res.status(403).json({ error: 'Only the board organizer can load demo data.' });
+    ensureFootprintTable(db); ensureInsightTables(db);
+    db.prepare("INSERT INTO school_baselines (leaderboard_id, data, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(leaderboard_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')").run(lb, JSON.stringify(LINCOLN.baseline));
+    db.prepare("INSERT INTO school_utility (leaderboard_id, data, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(leaderboard_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')").run(lb, JSON.stringify(LINCOLN.series));
+    auditLog(db, { actorUserId: req.userId, action: 'insights.load_demo', targetType: 'leaderboard', targetId: lb, leaderboardId: lb, detail: { school: LINCOLN.profile.name } });
+    res.json({ success: true, school: LINCOLN.profile.name });
+  } catch (err) { console.error('coach /insights/load-demo error:', err.message); res.status(500).json({ error: 'Internal server error' }); }
+});
+
+// Teacher/organizer approves a recommended action -> it joins the school's action plan.
+// HUMAN-IN-THE-LOOP: this decision is NOT made by the AI. Expected impact is recomputed
+// server-side (never trusts client numbers) and the approval is written to the audit log.
+router.post('/insights/approve', authMiddleware, (req, res) => {
+  try {
+    const db = getDb();
+    const lb = boardForUser(db, req);
+    if (!lb) return res.status(403).json({ error: 'Join or organize this board.' });
+    if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) return res.status(403).json({ error: 'Only the board organizer (teacher) can approve an action.' });
+    const itemKey = String((req.body && req.body.itemKey) || '').trim();
+    if (!itemKey) return res.status(400).json({ error: 'itemKey is required.' });
+    ensureFootprintTable(db); ensureInsightTables(db);
+    const { series } = loadUtilitySeries(db, lb);
+    const footprint = estimateFootprint(loadBaseline(db, lb));
+    const anomalies = detectAnomalies(series, { zThresh: 2 });
+    const rec = recommend(footprint, anomalies, { budget: 'any', maxItems: 50 }).find(r => r.key === itemKey);
+    if (!rec) return res.status(404).json({ error: 'Unknown recommendation for this board.' });
+    const verifyBy = new Date(Date.now() + rec.verifyByDays * 86400000).toISOString().slice(0, 10);
+    db.prepare("INSERT INTO action_plan_items (leaderboard_id, item_key, status, approved_by, approved_at, expected_kg, verify_by, payload) VALUES (?, ?, 'approved', ?, datetime('now'), ?, ?, ?) ON CONFLICT(leaderboard_id, item_key) DO UPDATE SET status='approved', approved_by=excluded.approved_by, approved_at=datetime('now'), expected_kg=excluded.expected_kg, verify_by=excluded.verify_by, payload=excluded.payload").run(lb, itemKey, req.userId, rec.expectedKgPerMonth, verifyBy, JSON.stringify(rec));
+    auditLog(db, { actorUserId: req.userId, action: 'insights.approve', targetType: 'action_plan_item', targetId: itemKey, leaderboardId: lb, detail: { label: rec.label, expectedKgPerMonth: rec.expectedKgPerMonth, verifyBy } });
+    res.json({ success: true, itemKey, status: 'approved', verifyBy, expectedKgPerMonth: rec.expectedKgPerMonth });
+  } catch (err) { console.error('coach /insights/approve error:', err.message); res.status(500).json({ error: 'Internal server error' }); }
+});
 
 module.exports = router;
 module.exports.runDueCoachTips = runDueCoachTips;
