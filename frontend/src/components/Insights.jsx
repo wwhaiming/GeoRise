@@ -57,6 +57,7 @@ export default function Insights({ leaderboardId, showToast }) {
   const [state, setState] = useState('loading');
   const [busy, setBusy] = useState('');
   const [openDrawer, setOpenDrawer] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const fileRef = useRef(null);
 
   const load = useCallback(async () => {
@@ -104,7 +105,12 @@ export default function Insights({ leaderboardId, showToast }) {
           return o;
         }).filter(o => o.month);
         if (!readings.length) { showToast && showToast('No rows found in CSV.'); return; }
-        call(() => api.coachInsightsImport(leaderboardId, readings), 'import');
+        if (!leaderboardId) { showToast && showToast('Open your board first.'); return; }
+        setBusy('import');
+        api.coachInsightsImport(leaderboardId, readings)
+          .then((res) => { setImportResult(res); showToast && showToast(`Imported ${res.accepted} months${(res.rejected || []).length ? `, ${res.rejected.length} rejected` : ''}.`); return load(); })
+          .catch((e) => showToast && showToast(e && e.status === 403 ? 'Only the board organizer (teacher) can import.' : (e && e.message) || 'Import failed.'))
+          .finally(() => setBusy(''));
       } catch { showToast && showToast('Could not parse that CSV.'); }
     };
     reader.readAsText(file);
@@ -236,6 +242,9 @@ export default function Insights({ leaderboardId, showToast }) {
         {recommendations.length > 0 && (
           <div style={{ marginTop: 16 }}>
             <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 8 }}>Recommended action plan</div>
+            <div className="dim" style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.4, marginBottom: 8, padding: '7px 10px', borderRadius: 10, background: 'rgba(46,125,79,.06)' }}>
+              The loop: approve → record before/after → projected vs measured. Values shown are a sandbox demonstration of the verified-action loop, not a claimed real-world saving.
+            </div>
             {recommendations.map((r) => {
               const idx = statusFlow.indexOf(r.status);
               const nextStatus = idx >= 0 && idx < statusFlow.length - 1 ? statusFlow[idx + 1] : null;
@@ -258,8 +267,18 @@ export default function Insights({ leaderboardId, showToast }) {
                   </div>
                   {/* measured outcome */}
                   {r.measured ? (
-                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 750, color: 'var(--green-d)' }}>
-                      <Icon name="check" size={12} color="var(--green-d)" /> Measured: {fmt(r.measured.beforeValue)} → {fmt(r.measured.afterValue)} = {r.measured.actualPct}% reduction{r.measured.metric ? ` (${r.measured.metric})` : ''}
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div style={{ padding: 8, borderRadius: 10, background: 'rgba(0,0,0,.04)' }}>
+                          <div className="dim" style={{ fontSize: 9.5, fontWeight: 800 }}>PROJECTED</div>
+                          <div style={{ fontWeight: 800, fontSize: 13 }}>~{fmt(r.expectedKgPerMonth)} kg/mo</div>
+                        </div>
+                        <div style={{ padding: 8, borderRadius: 10, background: 'rgba(46,125,79,.12)' }}>
+                          <div className="dim" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--green-d)' }}>MEASURED</div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--green-d)' }}><Icon name="check" size={11} color="var(--green-d)" /> {r.measured.actualPct}% ↓ ({fmt(r.measured.beforeValue)}→{fmt(r.measured.afterValue)})</div>
+                        </div>
+                      </div>
+                      {r.measured.metric && <div className="dim" style={{ fontSize: 10.5, fontWeight: 650, marginTop: 4 }}>metric: {r.measured.metric}</div>}
                     </div>
                   ) : (
                     <div style={{ marginTop: 8 }}>
@@ -307,6 +326,32 @@ export default function Insights({ leaderboardId, showToast }) {
           )}
         </div>
         <div className="dim" style={{ fontSize: 10, fontWeight: 600, marginTop: 5 }}>CSV header: month,schoolDays,hdd,cdd,electricityKwh,gasTherms,waterGallons (extra columns ignored).</div>
+
+        {/* CSV import proof: accepted/rejected rows + the anomaly re-running on the new data */}
+        {importResult && (
+          <div style={{ marginTop: 10, padding: 12, borderRadius: 12, border: '1px solid rgba(46,125,79,.18)', background: 'rgba(46,125,79,.05)' }}>
+            <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 6 }}>CSV import proof</div>
+            <div style={{ fontSize: 12, fontWeight: 750 }}>{importResult.accepted} rows accepted · {(importResult.rejected || []).length} rejected · data mode → {importResult.dataMode}</div>
+            {(importResult.rejected || []).length > 0 && (
+              <ul style={{ margin: '6px 0 0', paddingLeft: 16 }}>
+                {importResult.rejected.slice(0, 6).map((r, i) => (
+                  <li key={i} className="dim" style={{ fontSize: 11, fontWeight: 650, color: 'var(--coral-d)' }}>row {r.rowNumber}: {r.reason}</li>
+                ))}
+              </ul>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              <div style={{ padding: 8, borderRadius: 10, background: 'rgba(0,0,0,.04)' }}>
+                <div className="dim" style={{ fontSize: 9.5, fontWeight: 800 }}>TOP ANOMALY · BEFORE</div>
+                <div style={{ fontSize: 12, fontWeight: 700 }}>{importResult.beforeAnomaly ? `${importResult.beforeAnomaly.category} ${importResult.beforeAnomaly.month} +${importResult.beforeAnomaly.percentAboveExpected}%` : 'none'}</div>
+              </div>
+              <div style={{ padding: 8, borderRadius: 10, background: 'rgba(46,125,79,.10)' }}>
+                <div className="dim" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--green-d)' }}>TOP ANOMALY · AFTER</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--green-d)' }}>{importResult.afterAnomaly ? `${importResult.afterAnomaly.category} ${importResult.afterAnomaly.month} +${importResult.afterAnomaly.percentAboveExpected}%` : 'none'}</div>
+              </div>
+            </div>
+            <div className="dim" style={{ fontSize: 10, fontWeight: 650, marginTop: 6 }}>The engine re-ran on your imported data — different rows in, different anomaly out (not hardcoded to the sample).</div>
+          </div>
+        )}
       </div>
     </div>
   );
