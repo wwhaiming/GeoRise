@@ -1,15 +1,11 @@
 /* EcoRise — Feed, Quests, Profile, Leaderboard, Organizer pages */
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../components/Icon';
 import Avatar from '../components/Avatar';
 import Podium from '../components/Podium';
-import { PointsChip, RankBadge, Streak, Switch } from '../components/UI';
+import { PointsChip, RankBadge, Streak, Switch, METAL } from '../components/UI';
 import { ResetTimer } from '../components/Shared';
 import api from '../utils/api';
-
-function nowMs() {
-  return Date.now();
-}
 
 // ── mention renderer ──
 function mention(text) {
@@ -37,7 +33,7 @@ function CommentSection({ postId, ctx }) {
     let live = true;
     api.getComments(postId)
       .then(d => { if (live) setComments(d.comments || []); })
-      .catch(() => { /* comments are optional in offline demo mode */ })
+      .catch(() => {})
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [postId]);
@@ -49,7 +45,6 @@ function CommentSection({ postId, ctx }) {
     try {
       const c = await api.commentPost(postId, t);
       setComments(prev => [...prev, { id: c.id, text: t, user_name: c.user_name || 'You', created_at: c.created_at }]);
-      ctx.incrementCommentCount?.(postId);   // keep the feed card's count in sync
     } catch (err) {
       ctx.showToast(err.message || 'Could not post comment');
     }
@@ -79,25 +74,12 @@ function CommentSection({ postId, ctx }) {
 /* ============================================================
    FEED
    ============================================================ */
-// Static action-type theming for feed cards. Module-scoped so it isn't reallocated
-// on every render of every card.
-const FEED_THEME = {
-  transport: { c: '#2E7D4F', c2: '#75B77B', icon: 'bike' },
-  waste:     { c: '#5D8F86', c2: '#8FB8B0', icon: 'drop' },
-  food:      { c: '#75B77B', c2: '#AFCB85', icon: 'leaf' },
-  cleanup:   { c: '#B66F4D', c2: '#C6A35A', icon: 'trash' },
-  nature:    { c: '#2E7D4F', c2: '#AFCB85', icon: 'leaf' },
-  energy:    { c: '#C6A35A', c2: '#AFCB85', icon: 'bolt' },
-  community: { c: '#6F8F72', c2: '#5D8F86', icon: 'users' },
-};
-
 function FeedCard({ post, ctx }) {
   const [menu, setMenu] = useState(false);
   const [showC, setShowC] = useState(false);
-  const [imgErr, setImgErr] = useState(false);
   const ago = (() => {
     if (!post.created_at) return '';
-    const mins = Math.round((nowMs() - new Date(post.created_at).getTime()) / 60000);
+    const mins = Math.round((Date.now() - new Date(post.created_at).getTime()) / 60000);
     return mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.round(mins / 60)}h` : `${Math.round(mins / 1440)}d`;
   })();
 
@@ -111,45 +93,31 @@ function FeedCard({ post, ctx }) {
         </div>
         <button className="btn btn-ghost" style={{ padding: 6 }} aria-label="Post options" onClick={() => setMenu(!menu)}><Icon name="dots" size={22} /></button>
         {menu && (
-          <div style={{ position: 'absolute', top: 48, right: 14, zIndex: 10, background: 'var(--navy-800)', borderRadius: 14, padding: 6, boxShadow: '0 12px 30px rgba(30,91,57,.18)', border: '1px solid rgba(45,91,57,.12)' }}>
+          <div style={{ position: 'absolute', top: 48, right: 14, zIndex: 10, background: 'var(--navy-600)', borderRadius: 14, padding: 6, boxShadow: '0 12px 30px rgba(0,0,0,.5)', border: '1px solid rgba(255,255,255,.08)' }}>
             <button className="btn btn-ghost" style={{ color: 'var(--coral)', fontSize: 14, padding: '8px 14px', fontFamily: 'var(--body)', fontWeight: 800 }} onClick={() => { setMenu(false); ctx.reportPost(post.id); }}>
               <Icon name="x" size={16} color="var(--coral)" /> Report post
             </button>
           </div>
         )}
       </div>
-      {/* photo, or a designed action-typed gradient when there's no image */}
-      {(() => {
-        const hasPhoto = !imgErr && !!post.image && (post.image.startsWith('data:') || post.image.startsWith('http'));
-        const t = (post.action_type || '').toLowerCase();
-        const key = Object.keys(FEED_THEME).find(k => t.includes(k)) || 'nature';
-        const th = FEED_THEME[key];
-        return (
-          <div style={{
-            position: 'relative', height: hasPhoto ? 230 : 168, overflow: 'hidden',
-            display: 'flex', alignItems: 'flex-end', padding: 14,
-            background: hasPhoto ? undefined
-              : `radial-gradient(130% 120% at 86% -12%, ${th.c}33, transparent 55%), radial-gradient(110% 110% at 0% 120%, ${th.c2}28, transparent 55%), linear-gradient(150deg, #f7faf5, #dde8de)`,
-          }}>
-            {hasPhoto && <img src={post.image} alt={post.action_desc || 'Eco action'} onError={() => setImgErr(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
-            {!hasPhoto && <Icon name={th.icon} size={158} color={th.c} strokeWidth={1.4} style={{ position: 'absolute', right: -16, bottom: -26, opacity: .16, transform: 'rotate(-8deg)' }} />}
-            <div style={{ position: 'absolute', inset: 0, background: hasPhoto ? 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,.5))' : 'linear-gradient(180deg, transparent 45%, rgba(255,255,255,.66))' }} />
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-              <span className="chip" style={{ background: hasPhoto ? 'rgba(0,0,0,.4)' : 'rgba(255,255,255,.72)', color: hasPhoto ? '#fff' : 'var(--text)', backdropFilter: 'blur(6px)', fontSize: 12, boxShadow: `inset 0 0 0 1px ${th.c}55` }}>
-                <Icon name={th.icon} size={13} color={th.c} /> {post.action_type}
-              </span>
-              <PointsChip pts={post.points} />
-            </div>
-          </div>
-        );
-      })()}
+      {/* photo / gradient placeholder */}
+      <div style={{ position: 'relative', height: 230, background: post.image?.startsWith('data:') ? `url(${post.image}) center/cover` : 'linear-gradient(135deg,#0e7a4f,#11b06f)', display: 'flex', alignItems: 'flex-end', padding: 14 }}>
+        {post.image?.startsWith('data:') && <img src={post.image} alt={post.action_desc || 'Eco action'} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, transparent 40%, rgba(0,0,0,.45))' }} />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <span className="chip" style={{ background: 'rgba(0,0,0,.45)', color: '#fff', backdropFilter: 'blur(6px)', fontSize: 12 }}>
+            <Icon name="leaf" size={13} color="var(--green-2)" /> {post.action_type}
+          </span>
+          <PointsChip pts={post.points} />
+        </div>
+      </div>
       <div style={{ padding: '12px 14px 14px' }}>
         <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5, marginBottom: 6 }}>{post.action_desc}</div>
         {post.caption && <div className="muted" style={{ fontSize: 14, lineHeight: 1.45, fontWeight: 600 }}>{mention(post.caption)}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <span className="chip chip-dim" style={{ fontSize: 11.5 }}><Icon name="leaf" size={12} color="var(--green)" /> {post.co2_saved || 0} kg CO₂ saved</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(45,91,57,.10)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,.06)' }}>
           <button className="btn btn-ghost" style={{ padding: 0, gap: 7, color: post.liked ? 'var(--coral)' : 'var(--text-muted)', fontFamily: 'var(--body)', fontWeight: 800, fontSize: 14 }} aria-label={post.liked ? 'Unlike' : 'Like'} onClick={() => ctx.toggleLike(post.id)}>
             <Icon name="heart" size={22} color={post.liked ? 'var(--coral)' : 'var(--text-muted)'} fill={post.liked} /> {post.like_count || 0}
           </button>
@@ -171,7 +139,7 @@ export function Feed({ ctx }) {
     <div className="screen-in">
       <div style={{ padding: '16px 18px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="h1" style={{ fontSize: 27 }}>Feed</div>
-        <button className="btn btn-primary btn-sm" onClick={ctx.openLog}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Post</button>
+        <button className="btn btn-primary btn-sm" onClick={ctx.openLog}><Icon name="plus" size={18} color="#06281A" strokeWidth={3} /> Post</button>
       </div>
       <div style={{ padding: '8px 16px 100px', display: 'grid', gap: 16 }}>
         {(ctx.posts || []).length === 0 && (
@@ -194,7 +162,9 @@ export function Feed({ ctx }) {
    ============================================================ */
 export function Leaderboard({ ctx }) {
   const { members, bump, resetTarget, leaderboard } = ctx;
-  const [metric, setMetric] = useState('points');
+  const top3 = members.slice(0, 3);
+  const rest = members.slice(3);
+
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
 
@@ -212,15 +182,9 @@ export function Leaderboard({ ctx }) {
       setJoining(false);
     }
   };
-  const ranked = metric === 'co2'
-    ? [...members].sort((a, b) => (b.co2 || 0) - (a.co2 || 0)).map((m, i) => ({ ...m, rank: i + 1 }))
-    : members;
-  const top3 = ranked.slice(0, 3);
-  const rest = ranked.slice(3);
-  const teamCo2 = Math.round(members.reduce((s, m) => s + (m.co2 || 0), 0) * 10) / 10;
 
   return (
-    <div className="screen-in" style={{ paddingBottom: 24 }}>
+    <div className="screen-in" style={{ paddingBottom: 110 }}>
       <div style={{ padding: '18px 18px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div className="eyebrow" style={{ color: 'var(--green)' }}>{leaderboard?.name || 'EcoRise'}</div>
@@ -231,83 +195,57 @@ export function Leaderboard({ ctx }) {
         </button>
       </div>
 
-      {/* team impact: the board's total verified CO2e avoided — ties the leaderboard to the school's hidden footprint */}
       <div style={{ padding: '8px 16px 0' }}>
-        <div className="card" style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, border: '1px solid rgba(46,125,79,.18)' }}>
-          <span style={{ width: 44, height: 44, borderRadius: 13, background: 'rgba(46,125,79,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icon name="leaf" size={22} color="var(--green)" />
-          </span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="eyebrow" style={{ color: 'var(--green)' }}>Team impact · this season</div>
-            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18, lineHeight: 1.1 }}>{teamCo2} kg CO₂e avoided together</div>
-            <div className="muted" style={{ fontSize: 12, fontWeight: 650, marginTop: 2 }}>Verified across {members.length} members. See where your school&rsquo;s hidden footprint is biggest →</div>
-          </div>
-          <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Footprint coach" onClick={() => ctx.go('coach')}><Icon name="sparkle" size={18} color="var(--green)" /></button>
-        </div>
-      </div>
-
-      {/* rank metric toggle: points (engagement) vs CO2e avoided (real, deterministic impact) */}
-      <div style={{ padding: '10px 16px 0' }}>
-        <div style={{ display: 'flex', gap: 6, background: 'var(--navy-800)', padding: 5, borderRadius: 9999 }}>
-          {[['points', 'Points'], ['co2', 'CO₂e avoided']].map(([k, l]) => (
-            <button key={k} onClick={() => setMetric(k)} className="btn btn-sm" style={{
-              flex: 1, fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14,
-              background: metric === k ? 'linear-gradient(180deg,var(--navy-800),var(--navy-700))' : 'transparent',
-              color: metric === k ? 'var(--green-d)' : 'var(--text-dim)', boxShadow: metric === k ? '0 4px 12px rgba(30,91,57,.12)' : 'none',
-            }}>{l}</button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ padding: '8px 16px 0' }}>
-        <Podium top3={top3} variant={ctx.podiumVariant || 'cards'} bump={bump} metric={metric} />
+        <Podium top3={top3} variant={ctx.podiumVariant || 'cards'} bump={bump} />
       </div>
 
       <div style={{ padding: '14px 16px 0', display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
         <ResetTimer target={resetTarget} />
 
         {leaderboard?.prize && (
-          <div className="card card-glow" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 14, background: 'radial-gradient(160px 90px at 16% -10%, rgba(198,163,90,.18), transparent), linear-gradient(180deg,var(--navy-800),var(--navy-700))' }}>
-            <div style={{ width: 50, height: 50, borderRadius: 16, background: 'linear-gradient(180deg,var(--yellow),#B89240)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 18px rgba(111,77,52,.18)', flexShrink: 0 }}>
+          <div className="card card-glow" style={{ padding: 16, display: 'flex', alignItems: 'center', gap: 14, background: 'radial-gradient(160px 90px at 16% -10%, rgba(124,77,255,.25), transparent), linear-gradient(180deg,var(--navy-700),var(--navy-800))' }}>
+            <div style={{ width: 50, height: 50, borderRadius: 16, background: 'linear-gradient(180deg,#9D7BFF,#7C4DFF)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 8px 20px rgba(124,77,255,.5)', flexShrink: 0 }}>
               <Icon name="gift" size={28} color="#fff" />
             </div>
             <div style={{ flex: 1 }}>
-              <div className="eyebrow" style={{ color: 'var(--yellow)' }}>This season&rsquo;s prize</div>
+              <div className="eyebrow" style={{ color: 'var(--purple-2)' }}>This season&rsquo;s prize</div>
               <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 17 }}>{leaderboard.prize}</div>
             </div>
           </div>
         )}
 
-        <div className="card" style={{ padding: 6 }}>
-          {rest.map((p, i) => (
-            <div key={p.user_id} style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 16,
-              background: p.isYou ? 'linear-gradient(90deg, rgba(46,125,79,.12), rgba(46,125,79,.03))' : 'transparent',
-              boxShadow: p.isYou ? 'inset 0 0 0 1.5px rgba(46,125,79,.24)' : 'none',
-              borderBottom: i < rest.length - 1 ? '1px solid rgba(45,91,57,.10)' : 'none',
-            }}>
-              <RankBadge rank={p.rank} />
-              <Avatar src={p.avatar} name={p.name} size={42} ring={p.isYou ? 'var(--green)' : undefined} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                  {p.isYou && <span className="chip chip-green" style={{ padding: '2px 8px', fontSize: 11 }}>YOU</span>}
+        {rest.length > 0 && (
+          <div className="card" style={{ padding: 6 }}>
+            {rest.map((p, i) => (
+              <div key={p.user_id} style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 16,
+                background: p.isYou ? 'linear-gradient(90deg, rgba(0,230,118,.16), rgba(0,230,118,.04))' : 'transparent',
+                boxShadow: p.isYou ? 'inset 0 0 0 1.5px rgba(0,230,118,.4)' : 'none',
+                borderBottom: i < rest.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none',
+              }}>
+                <RankBadge rank={p.rank} />
+                <Avatar src={p.avatar} name={p.name} size={42} ring={p.isYou ? 'var(--green)' : undefined} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                    {p.isYou && <span className="chip chip-green" style={{ padding: '2px 8px', fontSize: 11 }}>YOU</span>}
+                  </div>
+                  <Streak n={p.streak || 0} size={12} />
                 </div>
-                <Streak n={p.streak || 0} size={12} />
+                <div style={{ textAlign: 'right' }}>
+                  <div className={bump === p.user_id ? 'count-flash' : ''} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16 }}>{(p.points || 0).toLocaleString()}</div>
+                  <div className="dim" style={{ fontSize: 10, fontWeight: 800, letterSpacing: .5 }}>PTS</div>
+                </div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className={bump === p.user_id ? 'count-flash' : ''} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16 }}>{metric === 'co2' ? (p.co2 || 0) : (p.points || 0).toLocaleString()}</div>
-                <div className="dim" style={{ fontSize: 10, fontWeight: 800, letterSpacing: .5 }}>{metric === 'co2' ? 'KG' : 'PTS'}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         <button className="btn btn-purple btn-block" onClick={() => copyInvite(leaderboard?.invite_code, ctx)}>
           <Icon name="share" size={19} color="#fff" /> Invite friends
         </button>
 
-        <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8 }}>
+        <form onSubmit={handleJoin} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
           <input
             className="field"
             placeholder="Enter invite code to join board"
@@ -317,7 +255,7 @@ export function Leaderboard({ ctx }) {
             required
           />
           <button className="btn btn-primary" type="submit" disabled={joining} style={{ padding: '0 18px' }}>
-            {joining ? 'Joining…' : 'Join'}
+            {joining ? 'Joining...' : 'Join'}
           </button>
         </form>
       </div>
@@ -338,19 +276,19 @@ export function Profile({ ctx }) {
     { label: 'CO₂ saved', value: (user.co2Saved || 0) + ' kg', color: 'var(--blue)' },
   ];
   const BADGE_MAP = {
-    first_action: { icon: 'star', c: '#2E7D4F', t: 'Starter' },
+    first_action: { icon: 'star', c: '#00E676', t: 'Starter' },
     seven_day_streak: { icon: 'flame', c: '#FF8A4B', t: 'On Fire' },
-    trash_hero: { icon: 'trash', c: '#B66F4D', t: 'Spotter' },
-    top_three: { icon: 'trophy', c: '#C6A35A', t: 'Podium' },
-    ten_actions: { icon: 'bolt', c: '#5D8F86', t: 'Veteran' },
+    trash_hero: { icon: 'trash', c: '#FF6B6B', t: 'Spotter' },
+    top_three: { icon: 'trophy', c: '#FFD23F', t: 'Podium' },
+    ten_actions: { icon: 'bolt', c: '#7C4DFF', t: 'Veteran' },
   };
   // Show only badges the user has actually earned (no decorative defaults).
-  const displayBadges = (user.badges || []).map(b => BADGE_MAP[b.badge_type || b] || { icon: 'star', c: '#5D8F86', t: 'Badge' });
+  const displayBadges = (user.badges || []).map(b => BADGE_MAP[b.badge_type || b] || { icon: 'star', c: '#38BDF8', t: 'Badge' });
 
   return (
     <div className="screen-in">
       <div style={{ padding: '20px 18px 6px', textAlign: 'center', position: 'relative' }}>
-        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} aria-label="Privacy & data" onClick={() => ctx.go('privacy')}>
+        <button className="btn btn-secondary btn-sm" style={{ position: 'absolute', top: 16, right: 18, padding: 10 }} aria-label="Settings" onClick={() => ctx.showToast('Settings')}>
           <Icon name="settings" size={20} />
         </button>
         <Avatar src={user.avatar} name={user.name} size={92} ring="var(--green)" glow style={{ margin: '0 auto 12px' }} />
@@ -360,7 +298,7 @@ export function Profile({ ctx }) {
       <div style={{ padding: '14px 16px 0' }}>
         <div className="card" style={{ padding: 6, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr' }}>
           {stats.map((s, i) => (
-            <div key={s.label} style={{ textAlign: 'center', padding: '12px 4px', borderRight: i < 3 ? '1px solid rgba(45,91,57,.10)' : 'none' }}>
+            <div key={s.label} style={{ textAlign: 'center', padding: '12px 4px', borderRight: i < 3 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
               <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 19, color: s.color }}>{s.value}</div>
               <div className="dim" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: .3, marginTop: 2 }}>{s.label}</div>
             </div>
@@ -385,9 +323,7 @@ export function Profile({ ctx }) {
         )}
       </div>
       <div style={{ padding: '18px 16px 100px', display: 'grid', gap: 12 }}>
-        <button className="btn btn-primary btn-block" onClick={() => ctx.go('leaderboard')}><Icon name="trophy" size={18} color="#fff" /> View leaderboard</button>
         <button className="btn btn-purple btn-block" onClick={() => ctx.go('organizer')}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Create a leaderboard</button>
-        <button className="btn btn-secondary btn-block" onClick={() => ctx.go('privacy')}><Icon name="check" size={18} /> Privacy &amp; data</button>
         <button className="btn btn-secondary btn-block" onClick={ctx.logout}>Log out</button>
       </div>
     </div>
@@ -412,7 +348,7 @@ export function Organizer({ ctx }) {
       <div style={{ padding: '16px 18px 6px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <button className="btn btn-secondary btn-sm" style={{ padding: 9 }} aria-label="Back" onClick={() => ctx.go('leaderboard')}><Icon name="chevL" size={20} /></button>
         <div>
-          <div className="eyebrow" style={{ color: 'var(--green)' }}>Organizer</div>
+          <div className="eyebrow" style={{ color: 'var(--purple-2)' }}>Organizer</div>
           <div className="h1" style={{ fontSize: 24 }}>Manage board</div>
         </div>
       </div>
@@ -422,8 +358,8 @@ export function Organizer({ ctx }) {
           {[['settings', 'Settings'], ['moderation', `Reports${reports.length ? ' · ' + reports.length : ''}`]].map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className="btn btn-sm" style={{
               flex: 1, fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14,
-              background: tab === k ? 'linear-gradient(180deg,var(--navy-800),var(--navy-700))' : 'transparent',
-              color: tab === k ? 'var(--green-d)' : 'var(--text-dim)', boxShadow: tab === k ? '0 4px 12px rgba(30,91,57,.12)' : 'none',
+              background: tab === k ? 'linear-gradient(180deg,var(--navy-600),var(--navy-700))' : 'transparent',
+              color: tab === k ? '#fff' : 'var(--text-dim)', boxShadow: tab === k ? '0 4px 12px rgba(0,0,0,.3)' : 'none',
             }}>{l}</button>
           ))}
         </div>
@@ -442,8 +378,8 @@ export function Organizer({ ctx }) {
                 <button key={o} onClick={() => setInterval_(o)} className="btn btn-sm" style={{
                   fontFamily: 'var(--display)', fontWeight: 600, fontSize: 13, padding: '11px 4px', textTransform: 'capitalize',
                   background: interval === o ? 'linear-gradient(180deg,var(--green-2),var(--green))' : 'var(--navy-800)',
-                  color: interval === o ? '#fff' : 'var(--text-muted)',
-                  boxShadow: interval === o ? '0 8px 16px rgba(30,91,57,.18)' : 'inset 0 0 0 1.5px var(--navy-500)',
+                  color: interval === o ? '#06281A' : 'var(--text-muted)',
+                  boxShadow: interval === o ? '0 6px 16px rgba(0,230,118,.35)' : 'inset 0 0 0 1.5px var(--navy-500)',
                 }}>{o}</button>
               ))}
             </div>
@@ -451,31 +387,31 @@ export function Organizer({ ctx }) {
           <div className="card" style={{ padding: '14px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(198,163,90,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="gift" size={20} color="var(--yellow)" /></span>
+                <span style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(124,77,255,.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="gift" size={20} color="var(--purple-2)" /></span>
                 <div>
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5 }}>Offer a prize</div>
                   <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>Shown on the leaderboard</div>
                 </div>
               </div>
-              <Switch on={prizeOn} onChange={setPrizeOn} color="var(--green)" label="Offer a prize" />
+              <Switch on={prizeOn} onChange={setPrizeOn} color="var(--purple)" />
             </div>
             {prizeOn && <input className="field" style={{ marginTop: 12 }} value={prize} onChange={e => setPrize(e.target.value)} placeholder="Describe the prize" />}
           </div>
           <div className="card" style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(46,125,79,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="user" size={20} color="var(--green)" /></span>
+              <span style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(0,230,118,.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="user" size={20} color="var(--green)" /></span>
               <div>
                 <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 15.5 }}>Include myself</div>
                 <div className="dim" style={{ fontSize: 12.5, fontWeight: 700 }}>Compete alongside members</div>
               </div>
             </div>
-            <Switch on={includeSelf} onChange={setIncludeSelf} label="Include myself" />
+            <Switch on={includeSelf} onChange={setIncludeSelf} />
           </div>
           <div>
             <label className="eyebrow" style={{ display: 'block', marginBottom: 8 }}>Invite link</label>
             <div style={{ display: 'flex', gap: 8 }}>
               <div className="field" style={{ flex: 1, display: 'flex', alignItems: 'center', color: 'var(--green)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>ecorise.app/j/{ctx.leaderboard?.invite_code || 'INVITE'}</div>
-              <button className="btn btn-primary" style={{ padding: '0 18px' }} aria-label="Copy invite link" onClick={() => copyInvite(ctx.leaderboard?.invite_code, ctx)}><Icon name="share" size={18} color="#fff" /></button>
+              <button className="btn btn-primary" style={{ padding: '0 18px' }} aria-label="Copy invite link" onClick={() => copyInvite(ctx.leaderboard?.invite_code, ctx)}><Icon name="share" size={18} color="#06281A" /></button>
             </div>
           </div>
           <button className="btn btn-purple btn-block btn-lg" onClick={async () => {
@@ -498,7 +434,7 @@ export function Organizer({ ctx }) {
           {reports.map(r => (
             <div key={r.id} className="card" style={{ padding: 14 }}>
               <div style={{ display: 'flex', gap: 12 }}>
-                <div style={{ width: 64, height: 64, borderRadius: 14, background: r.image?.startsWith('data:') ? `url(${r.image}) center/cover` : 'linear-gradient(135deg,var(--green-d),var(--green))', flexShrink: 0 }} />
+                <div style={{ width: 64, height: 64, borderRadius: 14, background: r.image?.startsWith('data:') ? `url(${r.image}) center/cover` : 'linear-gradient(135deg,#5b21b6,#7C4DFF)', flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14 }}>{r.user_name}</div>
                   <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, marginTop: 4 }}>{r.action_desc}</div>

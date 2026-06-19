@@ -7,6 +7,7 @@ import { Toast } from './components/UI';
 import { fireConfetti } from './components/Confetti';
 
 import Onboarding from './pages/Onboarding';
+import SetupBoard from './pages/SetupBoard';
 import Home from './pages/Home';
 import Quests from './pages/Quests';
 import { Feed, Leaderboard, Profile, Organizer } from './pages/Pages';
@@ -199,29 +200,48 @@ export default function App() {
     if (host) fireConfetti(host, { count: 80, origin: { x: 0.5, y: 0.42 } });
   };
 
+  // ── Join board by invite code (used by SetupBoard + Leaderboard inline form) ──
+  const joinBoardByCode = useCallback(async (code) => {
+    const r = await api.joinByCode(code);
+    showToast(`Joined ${r.name || 'the leaderboard'}!`);
+    await loadData(r.leaderboardId);
+    return r;
+  }, [loadData, showToast]);
+
+  // ── Called after board creation (skip redundant join toast) ──
+  const onBoardCreated = useCallback((board) => {
+    setLeaderboardId(board.id);
+    setLeaderboard(board);
+    loadData(board.id).catch(() => {});
+  }, [loadData]);
+
   // ── Auth callback ──
   const onAuth = async (userData) => {
     setUser(userData);
     setAuthed(true);
-    setScreen('coach');
-    // Clear demo seed immediately so a real user never sees fabricated standings.
     setMembers([]);
     setPosts([]);
 
-    // Resolve the user's board (create one if they have none) BEFORE loading data,
-    // so loadData() sees a real board instead of racing ahead of creation.
-    let board = null;
+    if (PENDING_INVITE) {
+      setScreen('coach');
+      await consumePendingInvite();
+      return;
+    }
+
+    // Check if user has a board; if not, send to setup screen to create or join.
     try {
       const data = await api.listLeaderboards();
-      board = data.leaderboards?.[0] || null;
+      const board = data.leaderboards?.[0] || null;
       if (!board) {
-        board = await api.createLeaderboard({ name: 'My EcoRise Board', resetInterval: 'weekly', prize: '', includeSelf: true });
+        setScreen('setup');
+        return;
       }
-      if (board) { setLeaderboardId(board.id); setLeaderboard(board); }
-    } catch { /* offline: stay empty rather than show fake data */ }
+      setLeaderboardId(board.id);
+      setLeaderboard(board);
+    } catch { /* offline */ }
 
-    await loadData(board?.id);
-    consumePendingInvite();
+    setScreen('coach');
+    await loadData();
   };
 
   // Predict the rank you move to after gaining `delta` points (for the Evidence
@@ -316,15 +336,17 @@ export default function App() {
     go, showToast, openLog: () => setModal('log'), openTrash: () => setModal('trash'),
     closeModal: () => setModal(null), toggleLike, reportPost, keepPost, deletePost, onActionComplete,
     updateLeaderboard, incrementCommentCount, logout,
+    joinBoardByCode, onBoardCreated,
     notifications, unreadCount, markNotificationsRead,
   };
 
   const isOnboarding = screen === 'onboarding' || !authed;
-  const showNav = !isOnboarding && screen !== 'organizer';
+  const showNav = !isOnboarding && screen !== 'organizer' && screen !== 'setup';
 
   const renderScreen = () => {
     if (isOnboarding) return <Onboarding onAuth={onAuth} />;
     switch (screen) {
+      case 'setup': return <SetupBoard ctx={ctx} onComplete={() => { loadData(); go('coach'); }} />;
       case 'home': return <Home ctx={ctx} />;
       case 'feed': return <Feed ctx={ctx} />;
       case 'quests': return <Quests ctx={ctx} />;
