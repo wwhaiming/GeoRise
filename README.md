@@ -23,7 +23,7 @@ Most sustainability apps either teach passively or gamify actions without proof.
 
 That makes the product easy to demo and technically defensible: every important claim has a source, a deterministic check, or an eval.
 
-> **Sticky hook:** *The AI never awards a point or invents a kilogram. It perceives; a deterministic, cited engine decides.*
+> **Sticky hook:** _The AI never awards a point or invents a kilogram. It perceives; a deterministic, cited engine decides._
 
 ## What's new in v2 (Direction B)
 
@@ -59,36 +59,36 @@ flowchart TD
   end
 ```
 
-The LLM only appears in the *perceive* and *draft* boxes. Every box that touches a number, a point, or a published post is deterministic code with a citation or a gate.
+The LLM only appears in the _perceive_ and _draft_ boxes. Every box that touches a number, a point, or a published post is deterministic code with a citation or a gate.
 
 ## How EcoRise compares
 
-| | Typical eco app | Generic "AI" hackathon app | **EcoRise** |
-|---|---|---|---|
-| Impact number | self-reported / hardcoded | LLM guesses it | deterministic carbon engine, cited EPA/OWID factors + uncertainty band |
-| Points | client-trusted | LLM awards them | server-computed, capped, immutable ledger; LLM cannot mint |
-| AI grounding | none | ungrounded generation | retrieval + citation + faithfulness + numeric-claim gates; refuses if unsupported |
-| Minor privacy | ignored | ignored | consent gate before upload, image minimization, teacher review, export/delete, audit log |
-| Evaluation | "it works" | demo only | measured: accuracy/FP/FN, Recall@k/MRR, refusal precision, hallucination rate (in-app) |
-| Scale story | hand-waved | hand-waved | measured load test + documented migration path |
+|               | Typical eco app           | Generic "AI" hackathon app | **EcoRise**                                                                              |
+| ------------- | ------------------------- | -------------------------- | ---------------------------------------------------------------------------------------- |
+| Impact number | self-reported / hardcoded | LLM guesses it             | deterministic carbon engine, cited EPA/OWID factors + uncertainty band                   |
+| Points        | client-trusted            | LLM awards them            | server-computed, capped, immutable ledger; LLM cannot mint                               |
+| AI grounding  | none                      | ungrounded generation      | retrieval + citation + faithfulness + numeric-claim gates; refuses if unsupported        |
+| Minor privacy | ignored                   | ignored                    | consent gate before upload, image minimization, teacher review, export/delete, audit log |
+| Evaluation    | "it works"                | demo only                  | measured: accuracy/FP/FN, Recall@k/MRR, refusal precision, hallucination rate (in-app)   |
+| Scale story   | hand-waved                | hand-waved                 | measured load test + documented migration path                                           |
 
 ## Core Features
 
-| Feature | Description |
-|---------|-------------|
-| **AI Eco Coach** | Main app experience. Retrieval-augmented coach that uses approved environmental sources plus local board activity to identify hidden footprint gaps, generate cited questions, explain answers, and recommend practical next actions. |
-| **AI Evidence Panel** | After **every** submission: which model decided, its confidence, the **grounded** CO₂ math (formula + cited source + uncertainty range), the full point breakdown, the deterministic tool pipeline that ran, and every anti-fraud gate cleared (or why it was rejected) — the AI's reasoning, made visible |
-| **AI Action Analysis** | Upload a photo → OpenAI vision **perceives** the action + measurable attributes; it never invents the impact |
-| **Grounded Carbon Engine** | Deterministic kg CO₂e from **published emission factors** (EPA GHG Hub, EPA WARM, OWID/Poore-Nemecek) with formula + uncertainty range — the LLM cannot fabricate the number ([`utils/carbonEngine.js`](backend/utils/carbonEngine.js)) |
-| **Measured Eval Gate** | The eco-action classifier is measured, not asserted: accuracy / FP / FN / adversarial-rejection / calibration ([`test/eco_eval/`](backend/test/eco_eval/), `npm run test:eval`); coach retrieval eval at `npm run test:coach-eval` |
-| **Adversarial Fraud Screen** | A second vision pass flags photo-of-screen / stock / AI-generated images; high suspicion rejects, low suspicion halves points ([`utils/integrityGates.js`](backend/utils/integrityGates.js)) |
-| **Points Rubric Engine** | Comprehensive **server-side** scoring across transport, waste, energy, food, nature, and learning; the LLM cannot award points |
-| **Social Feed** | Instagram-style cards with likes, comments, @mentions, reporting |
-| **Personalized Daily Quests** | 5 quests/day generated from your **real last-30-day behavior** (targets neglected categories), 2× multiplier on completion |
-| **Leaderboard** | Animated podium (3 styles), real-time ranking, reset timers |
-| **Trash Spotter** | Report litter, AI rates severity 0-10, earn bonus points |
-| **Organizer Dashboard** | Create/manage leaderboards, moderation queue, invite links |
-| **Badges & Streaks** | Automated badge awards, streak tracking, bonus multipliers |
+| Feature                       | Description                                                                                                                                                                                                                                                                                                |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AI Eco Coach**              | Main app experience. Retrieval-augmented coach that uses approved environmental sources plus local board activity to identify hidden footprint gaps, generate cited questions, explain answers, and recommend practical next actions.                                                                      |
+| **AI Evidence Panel**         | After **every** submission: which model decided, its confidence, the **grounded** CO₂ math (formula + cited source + uncertainty range), the full point breakdown, the deterministic tool pipeline that ran, and every anti-fraud gate cleared (or why it was rejected) — the AI's reasoning, made visible |
+| **AI Action Analysis**        | Upload a photo → OpenAI vision **perceives** the action + measurable attributes; it never invents the impact                                                                                                                                                                                               |
+| **Grounded Carbon Engine**    | Deterministic kg CO₂e from **published emission factors** (EPA GHG Hub, EPA WARM, OWID/Poore-Nemecek) with formula + uncertainty range — the LLM cannot fabricate the number ([`utils/carbonEngine.js`](backend/utils/carbonEngine.js))                                                                    |
+| **Measured Eval Gate**        | The eco-action classifier is measured, not asserted: accuracy / FP / FN / adversarial-rejection / calibration ([`test/eco_eval/`](backend/test/eco_eval/), `npm run test:eval`); coach retrieval eval at `npm run test:coach-eval`                                                                         |
+| **Adversarial Fraud Screen**  | A second vision pass flags photo-of-screen / stock / AI-generated images; high suspicion rejects, low suspicion halves points ([`utils/integrityGates.js`](backend/utils/integrityGates.js))                                                                                                               |
+| **Points Rubric Engine**      | Comprehensive **server-side** scoring across transport, waste, energy, food, nature, and learning; the LLM cannot award points                                                                                                                                                                             |
+| **Social Feed**               | Instagram-style cards with likes, comments, @mentions, reporting                                                                                                                                                                                                                                           |
+| **Personalized Daily Quests** | 5 quests/day generated from your **real last-30-day behavior** (targets neglected categories), 2× multiplier on completion                                                                                                                                                                                 |
+| **Leaderboard**               | Animated podium (3 styles), real-time ranking, reset timers                                                                                                                                                                                                                                                |
+| **Trash Spotter**             | Report litter, AI rates severity 0-10, earn bonus points                                                                                                                                                                                                                                                   |
+| **Organizer Dashboard**       | Create/manage leaderboards, moderation queue, invite links                                                                                                                                                                                                                                                 |
+| **Badges & Streaks**          | Automated badge awards, streak tracking, bonus multipliers                                                                                                                                                                                                                                                 |
 
 ---
 
@@ -109,8 +109,6 @@ The LLM only appears in the *perceive* and *draft* boxes. Every box that touches
 ### 1. Clone & Install
 
 ```bash
-cd ecorise
-
 # Install all dependencies
 npm run install:all
 ```
@@ -231,74 +229,82 @@ ecorise/
 ## 📡 API Endpoints
 
 ### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/signup` | Create account (email, password, name) |
-| POST | `/api/auth/login` | Login (email, password) |
-| POST | `/api/auth/logout` | Clear session |
-| GET | `/api/auth/me` | Get current user |
+
+| Method | Endpoint           | Description                            |
+| ------ | ------------------ | -------------------------------------- |
+| POST   | `/api/auth/signup` | Create account (email, password, name) |
+| POST   | `/api/auth/login`  | Login (email, password)                |
+| POST   | `/api/auth/logout` | Clear session                          |
+| GET    | `/api/auth/me`     | Get current user                       |
 
 ### Leaderboards
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/leaderboards` | Create leaderboard |
-| GET | `/api/leaderboards` | List user's leaderboards |
-| GET | `/api/leaderboards/:id` | Get leaderboard with ranked members |
-| PUT | `/api/leaderboards/:id` | Update settings (organizer) |
-| POST | `/api/leaderboards/join` | Join via invite code (no board id needed) |
-| POST | `/api/leaderboards/:id/join` | Join via invite code (legacy form) |
+
+| Method | Endpoint                     | Description                               |
+| ------ | ---------------------------- | ----------------------------------------- |
+| POST   | `/api/leaderboards`          | Create leaderboard                        |
+| GET    | `/api/leaderboards`          | List user's leaderboards                  |
+| GET    | `/api/leaderboards/:id`      | Get leaderboard with ranked members       |
+| PUT    | `/api/leaderboards/:id`      | Update settings (organizer)               |
+| POST   | `/api/leaderboards/join`     | Join via invite code (no board id needed) |
+| POST   | `/api/leaderboards/:id/join` | Join via invite code (legacy form)        |
 
 ### Posts (Feed)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/posts` | Create post (image → AI → points) |
-| GET | `/api/posts` | Get feed (optional `?leaderboardId=`) |
-| POST | `/api/posts/:id/like` | Toggle like |
-| POST | `/api/posts/:id/comment` | Add comment |
-| POST | `/api/posts/:id/report` | Report post |
-| DELETE | `/api/posts/:id` | Remove post (organizer) |
+
+| Method | Endpoint                 | Description                           |
+| ------ | ------------------------ | ------------------------------------- |
+| POST   | `/api/posts`             | Create post (image → AI → points)     |
+| GET    | `/api/posts`             | Get feed (optional `?leaderboardId=`) |
+| POST   | `/api/posts/:id/like`    | Toggle like                           |
+| POST   | `/api/posts/:id/comment` | Add comment                           |
+| POST   | `/api/posts/:id/report`  | Report post                           |
+| DELETE | `/api/posts/:id`         | Remove post (organizer)               |
 
 ### Quests
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/quests` | Get today's quests (auto-generates) |
-| POST | `/api/quests/:id/progress` | Update quest progress |
+
+| Method | Endpoint                   | Description                         |
+| ------ | -------------------------- | ----------------------------------- |
+| GET    | `/api/quests`              | Get today's quests (auto-generates) |
+| POST   | `/api/quests/:id/progress` | Update quest progress               |
 
 ### Trash Spotter
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/trash` | Report trash (image → AI severity → points) |
-| GET | `/api/trash` | Get reports |
+
+| Method | Endpoint     | Description                                 |
+| ------ | ------------ | ------------------------------------------- |
+| POST   | `/api/trash` | Report trash (image → AI severity → points) |
+| GET    | `/api/trash` | Get reports                                 |
 
 ### Users
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/users/:id` | Get user profile + badges |
-| PUT | `/api/users/:id` | Update profile |
-| GET | `/api/users/:id/notifications` | Get notifications |
+
+| Method | Endpoint                       | Description               |
+| ------ | ------------------------------ | ------------------------- |
+| GET    | `/api/users/:id`               | Get user profile + badges |
+| PUT    | `/api/users/:id`               | Update profile            |
+| GET    | `/api/users/:id/notifications` | Get notifications         |
 
 ### Coach (AI Eco Coach)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/coach/footprint` | School hidden-footprint digest |
-| GET | `/api/coach/question` | Retrieve a cited question + guidance |
-| GET | `/api/coach/eval-report` | In-app AI report card (live eval metrics) |
-| GET | `/api/coach/research` | Browse the approved research corpus |
+
+| Method | Endpoint                 | Description                               |
+| ------ | ------------------------ | ----------------------------------------- |
+| GET    | `/api/coach/footprint`   | School hidden-footprint digest            |
+| GET    | `/api/coach/question`    | Retrieve a cited question + guidance      |
+| GET    | `/api/coach/eval-report` | In-app AI report card (live eval metrics) |
+| GET    | `/api/coach/research`    | Browse the approved research corpus       |
 
 ### Privacy (FERPA/COPPA)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/privacy/policy` | Public model/data card |
-| GET | `/api/privacy/consent` | My consent state on a board |
-| POST | `/api/privacy/consent` | Record/attest/grant/revoke consent (accepts signed document upload) |
-| POST | `/api/privacy/boards/:id/privacy` | Set consent mode, retention, review, display mode |
-| GET | `/api/privacy/boards/:id/review-queue` | Pending posts (organizer) |
-| POST | `/api/privacy/posts/:id/review` | Approve / reject a post (reverses points) |
-| GET | `/api/privacy/audit` | Board audit trail (organizer) |
-| GET | `/api/privacy/boards/:id/consent-vault` | List members + consent status + document presence (organizer) |
-| GET | `/api/privacy/boards/:id/consent-vault/:userId/document` | Download a stored signed consent slip (organizer / self) |
-| GET | `/api/privacy/export` | Download all my data |
-| POST | `/api/privacy/account/delete` | Erase my account |
+
+| Method | Endpoint                                                 | Description                                                         |
+| ------ | -------------------------------------------------------- | ------------------------------------------------------------------- |
+| GET    | `/api/privacy/policy`                                    | Public model/data card                                              |
+| GET    | `/api/privacy/consent`                                   | My consent state on a board                                         |
+| POST   | `/api/privacy/consent`                                   | Record/attest/grant/revoke consent (accepts signed document upload) |
+| POST   | `/api/privacy/boards/:id/privacy`                        | Set consent mode, retention, review, display mode                   |
+| GET    | `/api/privacy/boards/:id/review-queue`                   | Pending posts (organizer)                                           |
+| POST   | `/api/privacy/posts/:id/review`                          | Approve / reject a post (reverses points)                           |
+| GET    | `/api/privacy/audit`                                     | Board audit trail (organizer)                                       |
+| GET    | `/api/privacy/boards/:id/consent-vault`                  | List members + consent status + document presence (organizer)       |
+| GET    | `/api/privacy/boards/:id/consent-vault/:userId/document` | Download a stored signed consent slip (organizer / self)            |
+| GET    | `/api/privacy/export`                                    | Download all my data                                                |
+| POST   | `/api/privacy/account/delete`                            | Erase my account                                                    |
 
 ---
 
@@ -306,28 +312,28 @@ ecorise/
 
 EcoRise uses a polished white/green system designed to feel like a field notebook crossed with a serious education product.
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Paper | `#F7FAF5` | App background |
-| White | `#FFFFFF` | Cards and sheets |
-| Moss green | `#2E7D4F` | Primary actions, active navigation, citations |
-| Deep green | `#1E5B39` | Headings and high-contrast ink |
-| Seed gold | `#C6A35A` | Prizes, podium accents, restrained highlights |
-| Clay | `#B66F4D` | Warnings, rejection states, destructive actions |
-| Display font | Fraunces | Editorial headings |
-| Body font | Hanken Grotesk | Dense UI text and labels |
+| Token        | Value          | Usage                                           |
+| ------------ | -------------- | ----------------------------------------------- |
+| Paper        | `#F7FAF5`      | App background                                  |
+| White        | `#FFFFFF`      | Cards and sheets                                |
+| Moss green   | `#2E7D4F`      | Primary actions, active navigation, citations   |
+| Deep green   | `#1E5B39`      | Headings and high-contrast ink                  |
+| Seed gold    | `#C6A35A`      | Prizes, podium accents, restrained highlights   |
+| Clay         | `#B66F4D`      | Warnings, rejection states, destructive actions |
+| Display font | Fraunces       | Editorial headings                              |
+| Body font    | Hanken Grotesk | Dense UI text and labels                        |
 
 ---
 
 ## 📝 Points Rubric
 
-| Category | Max | Example Actions |
-|----------|-----|-----------------|
-| Transportation | 40 pts | Walking (15 + 1/mi), Biking (15 + 0.8/mi), Transit (10 + 0.5/mi) |
-| Waste Reduction | 30 pts | Recycling (10-20), Composting (15), Zero-waste shopping (20) |
-| Energy | 25 pts | Line drying (12), Natural light (8), Cold wash (8) |
+| Category           | Max    | Example Actions                                                  |
+| ------------------ | ------ | ---------------------------------------------------------------- |
+| Transportation     | 40 pts | Walking (15 + 1/mi), Biking (15 + 0.8/mi), Transit (10 + 0.5/mi) |
+| Waste Reduction    | 30 pts | Recycling (10-20), Composting (15), Zero-waste shopping (20)     |
+| Energy             | 25 pts | Line drying (12), Natural light (8), Cold wash (8)               |
 | Food & Consumption | 30 pts | Plant-based meal (15), Growing food (20), Buying secondhand (15) |
-| Nature & Community | 20 pts | Planting trees (20), Cleanup event (20), Educating others (15) |
+| Nature & Community | 20 pts | Planting trees (20), Cleanup event (20), Educating others (15)   |
 
 **Bonus multipliers:** First action of day (1.1×) · 7-day streak (1.25×) · Quest completion (2×) · Tagged friends (+5 each, max 3)
 
