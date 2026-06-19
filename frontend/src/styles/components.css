@@ -54,8 +54,10 @@
    ============================================================ */
 .card {
   position: relative;
+  /* Solid translucent gradient (no backdrop-filter): blurring the backdrop of every
+     card re-sampled the aurora + grain on each scroll frame and tanked FPS. The
+     gradient alone keeps the matte-glass look without the per-frame reblur. */
   background: linear-gradient(180deg, var(--glass), var(--glass-strong));
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
   border-radius: var(--r-lg);
   border: 1px solid var(--glass-edge-soft);
   box-shadow:
@@ -106,8 +108,9 @@ button.card:hover {
 .nav {
   display: flex; align-items: stretch; justify-content: space-between;
   padding: 13px 10px calc(15px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(180deg, rgba(255,255,255,.78), rgba(247,250,245,.96));
-  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+  /* Opaque-enough gradient, no backdrop-filter (always on screen = re-blurred every
+     scroll frame). Bumped to near-solid so content scrolling under it stays clean. */
+  background: linear-gradient(180deg, rgba(247,250,245,.97), rgba(247,250,245,1));
   border-top: 1px solid rgba(45,91,57,.12);
   position: relative; z-index: 30;
 }

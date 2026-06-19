@@ -151,10 +151,10 @@ export default function ResearchLibrary({ showToast }) {
     } finally { setAsking(false); }
   };
 
-  const loadPapers = useCallback(async (nextTopic = topic, nextSearch = search) => {
+  const loadPapers = useCallback(async (nextTopic = topic, nextSearch = search, random = false) => {
     setLoadingPapers(true);
     try {
-      const r = await api.coachPapers({ q: nextSearch, topic: nextTopic, limit: 12 });
+      const r = await api.coachPapers({ q: nextSearch, topic: nextTopic, limit: 12, random });
       setPapers(r.papers); setTotal(r.total);
     } catch (e) { showToast?.(e.message || 'Could not load papers'); }
     finally { setLoadingPapers(false); }
@@ -198,7 +198,8 @@ export default function ResearchLibrary({ showToast }) {
           <input className="field" value={search} onChange={e => setSearch(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && loadPapers(topic, search)}
             placeholder="Search 1,000 papers by title…" style={{ flex: 1 }} />
-          <button className="btn btn-secondary" onClick={() => loadPapers(topic, search)} style={{ flexShrink: 0 }}>
+          <button className="btn btn-secondary" onClick={() => loadPapers(topic, search, true)} style={{ flexShrink: 0 }}
+            title="Show a fresh random set of papers — click again for new ones">
             <Icon name="home" size={16} /> Browse
           </button>
         </div>
@@ -220,7 +221,7 @@ export default function ResearchLibrary({ showToast }) {
           </div>
         )}
         {papers === null && !loadingPapers && (
-          <button className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => loadPapers()}>
+          <button className="btn btn-ghost btn-block btn-sm" style={{ marginTop: 8 }} onClick={() => loadPapers(topic, search, true)}>
             Browse the corpus →
           </button>
         )}

@@ -291,15 +291,19 @@ router.get('/papers', authMiddleware, (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 80);
   const topic = String(req.query.topic || '').trim().slice(0, 30);
   const limit = Math.max(1, Math.min(50, parseInt(req.query.limit, 10) || 20));
-  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  // random=1 -> return a fresh shuffled sample each call (used by the "Browse" button,
+  // so clicking it again surfaces new papers). Offset is ignored when shuffling.
+  const random = String(req.query.random || '') === '1';
+  const offset = random ? 0 : Math.max(0, parseInt(req.query.offset, 10) || 0);
   const where = ["status = 'approved'", 'provenance = ?'];
   const params = [RESEARCH_PROVENANCE];
   if (q) { where.push('title LIKE ?'); params.push(`%${q}%`); }
   if (topic) { where.push('topic_tags LIKE ?'); params.push(`%"${topic}"%`); }
   const sql = `FROM eco_sources WHERE ${where.join(' AND ')}`;
   const total = db.prepare(`SELECT COUNT(*) c ${sql}`).get(...params).c;
+  const order = random ? 'ORDER BY RANDOM()' : 'ORDER BY pub_year DESC, title ASC';
   const rows = db.prepare(`SELECT id, title, authors, institution, url, pub_year, topic_tags
-    ${sql} ORDER BY pub_year DESC, title ASC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    ${sql} ${order} LIMIT ? OFFSET ?`).all(...params, limit, offset);
   res.json({
     total, limit, offset,
     papers: rows.map(r => ({ id: r.id, title: r.title, authors: r.authors, year: r.pub_year,
