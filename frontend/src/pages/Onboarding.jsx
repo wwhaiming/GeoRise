@@ -5,12 +5,18 @@ import { LogoMark, Wordmark, Orbs } from '../components/Shared';
 import api from '../utils/api';
 
 const ONB_STEPS = [
-  { key: 'coach', icon: 'sparkle', color: '#2E7D4F',
-    title: 'Ask the AI footprint coach', sub: 'The coach studies your school board, finds hidden impact patterns, and turns them into a practical action plan.' },
-  { key: 'learn', icon: 'leaf', color: '#5D8F86',
-    title: 'Learn from cited sources', sub: 'Questions, tips, and explanations come from approved environmental research instead of unsupported AI guesses.' },
-  { key: 'prove', icon: 'camera', color: '#C6A35A',
-    title: 'Turn insight into proof', sub: 'Log a photo when you act. AI checks the evidence, deterministic code scores it, and the leaderboard updates.' },
+  {
+    key: 'coach', icon: 'sparkle', color: '#2E7D4F',
+    title: 'Ask the AI footprint coach', sub: 'The coach studies your school board, finds hidden impact patterns, and turns them into a practical action plan.'
+  },
+  {
+    key: 'learn', icon: 'leaf', color: '#5D8F86',
+    title: 'Learn from cited sources', sub: 'Questions, tips, and explanations come from approved environmental research instead of unsupported AI guesses.'
+  },
+  {
+    key: 'prove', icon: 'camera', color: '#C6A35A',
+    title: 'Turn insight into proof', sub: 'Log a photo when you act. AI checks the evidence, deterministic code scores it, and the leaderboard updates.'
+  },
 ];
 
 export default function Onboarding({ onAuth }) {
@@ -81,7 +87,7 @@ export default function Onboarding({ onAuth }) {
   if (stage === 'carousel') {
     const s = ONB_STEPS[step];
     return (
-      <div className="screen-in" style={{ height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', padding: '52px 26px 32px' }}>
+      <div className="screen-in" style={{ height: '100%', position: 'relative', display: 'flex', flexDirection: 'column', padding: '5px 26px 20px' }}>
         <Orbs />
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Wordmark size={20} />
