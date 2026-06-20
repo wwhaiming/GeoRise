@@ -63,7 +63,7 @@ swap is localized — callers (coach, school-insight, research ask) are unchange
 ## Disaster / degraded modes
 
 - **No API key**: the whole app runs offline — deterministic mock vision/text + the
-  in-repo ONNX litter CNN. The demo and the full test suite (102 tests: 91 backend + 11 frontend)
+  in-repo ONNX litter CNN. The demo and the full test suite (119 tests: 108 backend + 11 frontend)
   run with no network.
 - **Embedding provider drift**: `retrieve()` skips vectors whose dimension doesn't match
   the query, so a corpus embedded with one provider and a query from another

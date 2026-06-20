@@ -15,6 +15,14 @@ const CONSENT_LABEL = { demo: 'Demo (open)', classroom: 'Classroom (teacher atte
 const RETENTION_LABEL = { minimize: 'Minimize (thumbnail only)', standard: 'Standard (full image)', '24h': 'Auto-delete after 24h', do_not_store: 'Do not store (label only)' };
 const DISPLAY_LABEL = { names: 'Show member names', initials: 'Initials only (pseudonymous)' };
 
+function PolicySelect({ value, onChange, options }) {
+  return (
+    <select className="field" value={value} onChange={e => onChange(e.target.value)} style={{ marginTop: 6 }}>
+      {Object.entries(options).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+    </select>
+  );
+}
+
 function Section({ icon, title, children, tint = 'var(--green)' }) {
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -136,12 +144,6 @@ export default function PrivacyCenter({ ctx }) {
     catch (e) { showToast(e.message || 'Delete failed'); setBusy(false); }
   };
 
-  const Select = ({ value, onChange, options }) => (
-    <select className="field" value={value} onChange={e => onChange(e.target.value)} style={{ marginTop: 6 }}>
-      {Object.entries(options).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-    </select>
-  );
-
   return (
     <div className="screen-in" style={{ paddingBottom: 110 }}>
       <div style={{ padding: '16px 18px 6px', display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -196,14 +198,14 @@ export default function PrivacyCenter({ ctx }) {
         {isOrganizer && (
           <Section icon="settings" title="Teacher controls (this board)">
             <label className="dim" style={{ fontSize: 11.5, fontWeight: 800 }}>Consent mode</label>
-            <Select value={board.consentMode} onChange={v => saveBoard({ consentMode: v })} options={CONSENT_LABEL} />
+            <PolicySelect value={board.consentMode} onChange={v => saveBoard({ consentMode: v })} options={CONSENT_LABEL} />
             <label className="dim" style={{ fontSize: 11.5, fontWeight: 800, display: 'block', marginTop: 12 }}>Image retention</label>
-            <Select value={board.retentionMode} onChange={v => saveBoard({ retentionMode: v })} options={RETENTION_LABEL} />
+            <PolicySelect value={board.retentionMode} onChange={v => saveBoard({ retentionMode: v })} options={RETENTION_LABEL} />
             <button className="btn btn-secondary btn-sm btn-block" style={{ marginTop: 12 }} onClick={() => saveBoard({ reviewRequired: !board.reviewRequired })}>
               <Icon name={board.reviewRequired ? 'check' : 'x'} size={15} /> Review before publish: {board.reviewRequired ? 'ON' : 'OFF'}
             </button>
             <label className="dim" style={{ fontSize: 11.5, fontWeight: 800, display: 'block', marginTop: 12 }}>Leaderboard display</label>
-            <Select value={board.displayMode} onChange={v => saveBoard({ displayMode: v })} options={DISPLAY_LABEL} />
+            <PolicySelect value={board.displayMode} onChange={v => saveBoard({ displayMode: v })} options={DISPLAY_LABEL} />
           </Section>
         )}
 

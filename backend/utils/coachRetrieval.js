@@ -16,7 +16,22 @@ const { embed, cosineSim, toBlob, fromBlob } = require('./coachEmbed');
 // chunkId -> deserialized Float32Array. Used only by the brute-force fallback path;
 // avoids re-allocating + re-parsing every chunk's embedding BLOB on every call.
 // Invalidated on re-ingest below.
+const EMB_CACHE_MAX = Math.max(100, Math.min(50000, Number(process.env.COACH_EMBED_CACHE_MAX) || 5000));
 const _embCache = new Map();
+
+function getCachedEmbedding(id) {
+  if (!_embCache.has(id)) return null;
+  const value = _embCache.get(id);
+  _embCache.delete(id);
+  _embCache.set(id, value);
+  return value;
+}
+
+function cacheEmbedding(id, value) {
+  if (_embCache.has(id)) _embCache.delete(id);
+  while (_embCache.size >= EMB_CACHE_MAX) _embCache.delete(_embCache.keys().next().value);
+  _embCache.set(id, value);
+}
 
 // Module-level state for the vec0 virtual table.
 // _hasSqliteVec: null = not yet probed, true/false = cached result.
@@ -180,11 +195,11 @@ async function retrieve(db, queryText, { k = 5, courseId = null } = {}) {
 
   const scored = [];
   for (const r of rows) {
-    let v = _embCache.get(r.id);
+    let v = getCachedEmbedding(r.id);
     if (!v) {
       v = fromBlob(r.embedding);
       if (!v) continue;                   // un-embedded chunk -> not retrievable yet
-      _embCache.set(r.id, v);
+      cacheEmbedding(r.id, v);
     }
     // Provider drift guard: skip mismatched vectors so retrieval fail-closes to
     // "no corpus" instead of silently citing garbage from a different embedding model.
@@ -206,4 +221,3 @@ function syncVectorTable(db, dim) {
 }
 
 module.exports = { retrieve, ingestSourceChunks, syncVectorTable };
-

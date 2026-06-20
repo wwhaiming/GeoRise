@@ -19,6 +19,19 @@ const STATUS_LABEL = { proposed: 'Proposed', requested: 'Requested', approved: '
 const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
+function Chip({ children, tone }) {
+  return <span className="chip" style={{ fontSize: 10, background: tone === 'excl' ? 'rgba(182,111,77,.14)' : 'rgba(46,125,79,.12)', color: tone === 'excl' ? 'var(--coral-d)' : 'var(--green-d)' }}>{children}</span>;
+}
+
+function EvidenceRow({ label, value }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div className="dim" style={{ fontWeight: 700, fontSize: 10 }}>{label}</div>
+      <div style={{ fontWeight: 650, fontSize: 11.5, lineHeight: 1.3 }}>{value}</div>
+    </div>
+  );
+}
+
 function LoadingState() {
   const steps = ['Normalizing weather (degree-days)', 'Learning expected baseline', 'Checking residuals for anomalies', 'Backtesting + ranking interventions'];
   return (
@@ -44,8 +57,8 @@ function VerifyRow({ rec, busy, onVerify }) {
     <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
       <div className="dim" style={{ fontSize: 10.5, fontWeight: 700 }}>Record measured outcome ({rec.verificationMetric})</div>
       <div className="row" style={{ gap: 6 }}>
-        <input className="field" style={{ flex: 1, padding: '6px 8px', fontSize: 12 }} inputMode="decimal" placeholder="before" value={before} onChange={e => setBefore(e.target.value)} aria-label="before value" />
-        <input className="field" style={{ flex: 1, padding: '6px 8px', fontSize: 12 }} inputMode="decimal" placeholder="after" value={after} onChange={e => setAfter(e.target.value)} aria-label="after value" />
+        <input className="field" style={{ flex: 1, padding: '6px 8px', fontSize: 12 }} type="number" min="0.000001" inputMode="decimal" placeholder="before" value={before} onChange={e => setBefore(e.target.value)} aria-label="before value" />
+        <input className="field" style={{ flex: 1, padding: '6px 8px', fontSize: 12 }} type="number" min="0" inputMode="decimal" placeholder="after" value={after} onChange={e => setAfter(e.target.value)} aria-label="after value" />
         <button className="btn btn-secondary btn-sm" disabled={busy || !before || !after} onClick={() => onVerify(rec.key, Number(before), Number(after), rec.verificationMetric)}>Save</button>
       </div>
     </div>
@@ -58,16 +71,26 @@ export default function Insights({ leaderboardId, showToast }) {
   const [busy, setBusy] = useState('');
   const [openDrawer, setOpenDrawer] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [loadedFor, setLoadedFor] = useState();
   const fileRef = useRef(null);
+  const target = leaderboardId ?? null;
 
   const load = useCallback(async () => {
     try { const d = await api.coachInsights(leaderboardId); setData(d); setState('ready'); }
     catch { setState('hidden'); }
-  }, [leaderboardId]);
-  useEffect(() => { setState('loading'); load(); }, [load]);
+    finally { setLoadedFor(target); }
+  }, [leaderboardId, target]);
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => api.coachInsights(leaderboardId))
+      .then(result => { if (active) { setData(result); setState('ready'); setLoadedFor(target); } })
+      .catch(() => { if (active) { setState('hidden'); setLoadedFor(target); } });
+    return () => { active = false; };
+  }, [leaderboardId, target]);
 
-  if (state === 'hidden') return null;
-  if (state === 'loading') return <LoadingState />;
+  const displayState = loadedFor === target ? state : 'loading';
+  if (displayState === 'hidden') return null;
+  if (displayState === 'loading') return <LoadingState />;
   if (!data) return null;
 
   const { anomalies = [], forecast = {}, recommendations = [], summary, school, sampleData, profile,
@@ -116,16 +139,6 @@ export default function Insights({ leaderboardId, showToast }) {
     reader.readAsText(file);
   };
 
-  const Chip = ({ children, tone }) => (
-    <span className="chip" style={{ fontSize: 10, background: tone === 'excl' ? 'rgba(182,111,77,.14)' : 'rgba(46,125,79,.12)', color: tone === 'excl' ? 'var(--coral-d)' : 'var(--green-d)' }}>{children}</span>
-  );
-  const EvRow = ({ k, v }) => (
-    <div style={{ minWidth: 0 }}>
-      <div className="dim" style={{ fontWeight: 700, fontSize: 10 }}>{k}</div>
-      <div style={{ fontWeight: 650, fontSize: 11.5, lineHeight: 1.3 }}>{v}</div>
-    </div>
-  );
-
   return (
     <div style={{ padding: '16px 16px 0' }}>
       <div className="card" style={{ padding: 16 }}>
@@ -147,14 +160,14 @@ export default function Insights({ leaderboardId, showToast }) {
         <div style={{ marginTop: 12, padding: 12, borderRadius: 12, border: '1px solid rgba(46,125,79,.16)', background: 'rgba(46,125,79,.05)' }}>
           <div className="eyebrow" style={{ color: 'var(--green)', marginBottom: 8 }}>Judge evidence</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '7px 12px' }}>
-            <EvRow k="Data" v={isReal ? 'Real import' : 'Synthetic sandbox'} />
-            <EvRow k="AI mode" v={judgeEvidence.aiMode || '—'} />
-            <EvRow k="Model" v={judgeEvidence.model || (evaluation && evaluation.model) || 'OLS (interpretable)'} />
-            <EvRow k="Backtest MAPE" v={judgeEvidence.holdoutMapePct != null ? `${judgeEvidence.holdoutMapePct}%` : '—'} />
-            <EvRow k="Anomaly rule" v={judgeEvidence.anomalyThreshold || 'residual z ≥ 2'} />
-            <EvRow k="Features" v={(judgeEvidence.features || []).join(', ') || '—'} />
-            <EvRow k="Human approval" v="required (named adult)" />
-            <EvRow k="Tests" v={judgeEvidence.tests ? `${judgeEvidence.tests.passed}/${judgeEvidence.tests.total} ${judgeEvidence.tests.status || 'passing'}${judgeEvidence.tests.generatedAt ? ` · ${String(judgeEvidence.tests.generatedAt).slice(0, 10)}` : ''}` : (judgeEvidence.testCommand || 'npm test')} />
+            <EvidenceRow label="Data" value={isReal ? 'Real import' : 'Synthetic sandbox'} />
+            <EvidenceRow label="AI mode" value={judgeEvidence.aiMode || '—'} />
+            <EvidenceRow label="Model" value={judgeEvidence.model || (evaluation && evaluation.model) || 'OLS (interpretable)'} />
+            <EvidenceRow label="Backtest MAPE" value={judgeEvidence.holdoutMapePct != null ? `${judgeEvidence.holdoutMapePct}%` : '—'} />
+            <EvidenceRow label="Anomaly rule" value={judgeEvidence.anomalyThreshold || 'residual z ≥ 2'} />
+            <EvidenceRow label="Features" value={(judgeEvidence.features || []).join(', ') || '—'} />
+            <EvidenceRow label="Human approval" value="required (named adult)" />
+            <EvidenceRow label="Tests" value={judgeEvidence.tests ? `${judgeEvidence.tests.passed}/${judgeEvidence.tests.total} ${judgeEvidence.tests.status || 'passing'}${judgeEvidence.tests.generatedAt ? ` · ${String(judgeEvidence.tests.generatedAt).slice(0, 10)}` : ''}` : (judgeEvidence.testCommand || 'npm test')} />
           </div>
           <div style={{ marginTop: 10, fontSize: 11.5, fontWeight: 700, lineHeight: 1.4, color: isReal ? 'var(--green-d)' : 'var(--coral-d)' }}>
             {isReal
@@ -249,6 +262,9 @@ export default function Insights({ leaderboardId, showToast }) {
               const idx = statusFlow.indexOf(r.status);
               const nextStatus = idx >= 0 && idx < statusFlow.length - 1 ? statusFlow[idx + 1] : null;
               const isApproved = r.status && r.status !== 'proposed';
+              const measuredColor = r.measured?.actualPct < 0 ? 'var(--coral-d)' : 'var(--green-d)';
+              const measuredBg = r.measured?.actualPct < 0 ? 'rgba(182,111,77,.12)' : 'rgba(46,125,79,.12)';
+              const measuredArrow = r.measured?.actualPct > 0 ? '↓' : r.measured?.actualPct < 0 ? '↑' : '→';
               return (
                 <div key={r.key} className="card" style={{ padding: 12, marginBottom: 8 }}>
                   <div className="row" style={{ gap: 8 }}>
@@ -273,9 +289,9 @@ export default function Insights({ leaderboardId, showToast }) {
                           <div className="dim" style={{ fontSize: 9.5, fontWeight: 800 }}>PROJECTED</div>
                           <div style={{ fontWeight: 800, fontSize: 13 }}>~{fmt(r.expectedKgPerMonth)} kg/mo</div>
                         </div>
-                        <div style={{ padding: 8, borderRadius: 10, background: 'rgba(46,125,79,.12)' }}>
-                          <div className="dim" style={{ fontSize: 9.5, fontWeight: 800, color: 'var(--green-d)' }}>MEASURED</div>
-                          <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--green-d)' }}><Icon name="check" size={11} color="var(--green-d)" /> {r.measured.actualPct}% ↓ ({fmt(r.measured.beforeValue)}→{fmt(r.measured.afterValue)})</div>
+                        <div style={{ padding: 8, borderRadius: 10, background: measuredBg }}>
+                          <div className="dim" style={{ fontSize: 9.5, fontWeight: 800, color: measuredColor }}>MEASURED</div>
+                          <div style={{ fontWeight: 800, fontSize: 13, color: measuredColor }}><Icon name={r.measured.actualPct < 0 ? 'arrowR' : 'check'} size={11} color={measuredColor} /> {Math.abs(r.measured.actualPct)}% {measuredArrow} ({fmt(r.measured.beforeValue)}→{fmt(r.measured.afterValue)})</div>
                         </div>
                       </div>
                       {r.measured.metric && <div className="dim" style={{ fontSize: 10.5, fontWeight: 650, marginTop: 4 }}>metric: {r.measured.metric}</div>}

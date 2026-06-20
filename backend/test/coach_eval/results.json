@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-18T19:06:23.438Z",
+  "generatedAt": "2026-06-20T00:42:28.434Z",
   "note": "Illustrative fixtures of the responsible-AI properties (citation validity, faithfulness, refusal, hallucination, injection resistance, point cap). Deterministic offline harness, NOT a third-party benchmark. Regenerate: npm run test:coach-eval.",
   "metrics": {
     "n": 13,

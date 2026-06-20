@@ -31,13 +31,22 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loadedFor, setLoadedFor] = useState();
+  const target = leaderboardId ?? null;
 
   const load = useCallback(async () => {
     try { setData(await api.coachSchoolInsight(leaderboardId)); setErr(false); }
     catch { setErr(true); }
-  }, [leaderboardId]);
+    finally { setLoadedFor(target); }
+  }, [leaderboardId, target]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => api.coachSchoolInsight(leaderboardId))
+      .then(result => { if (active) { setData(result); setErr(false); setLoadedFor(target); } })
+      .catch(() => { if (active) { setErr(true); setLoadedFor(target); } });
+    return () => { active = false; };
+  }, [leaderboardId, target]);
 
   const save = async () => {
     if (saving) return;
@@ -50,11 +59,11 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
       await load();
       showToast?.('Footprint baseline updated');
     } catch (e) {
-      showToast?.(e?.status === 403 ? 'Join or organize a board to set its baseline.' : (e.message || 'Could not save baseline'));
+      showToast?.(e?.status === 403 ? 'Only the board organizer can set its baseline.' : (e.message || 'Could not save baseline'));
     } finally { setSaving(false); }
   };
 
-  if (err || !data) {
+  if (loadedFor !== target || err || !data) {
     return (
       <div style={{ padding: '8px 16px 0' }}>
         <div className="card" style={{ padding: 14 }}>

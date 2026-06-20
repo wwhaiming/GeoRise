@@ -115,7 +115,7 @@ function ToolCalls({ tools, accent }) {
 export default function AIEvidence({ data, onClose }) {
   const panelRef = useRef(null);
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
   // Accessible modal, MOUNT-ONLY: Escape closes, focus moves into the dialog on open,
   // and focus is restored to the triggering control on close. Deps [] (onClose via ref)
   // so unrelated parent re-renders don't tear down the listener or steal focus.

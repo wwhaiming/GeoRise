@@ -1,8 +1,4 @@
-/* EcoRise — Leaderboard routes
- * leaderboard-invite branch: leaderboard + invite/share behavior reverted to the
- * ce77219 build (points-only ranking, no CO2 metric, no name masking, no organizer
- * auto-consent, join via POST /:id/join). Everything else stays on main.
- */
+/* EcoRise — Leaderboard routes */
 const express = require('express');
 const { v4: uuid } = require('uuid');
 const { getDb } = require('../db');
@@ -12,7 +8,7 @@ const { body } = require('../utils/validate');
 // Kept from main (NOT a leaderboard-display feature): records the organizer's own
 // consent on board creation so the teacher can still post. Removing it would break
 // posting on new boards (consent gate in posts.js) — i.e. "everything else" would change.
-const { recordConsent } = require('../utils/privacy');
+const { recordConsent, maskDisplay } = require('../utils/privacy');
 
 const router = express.Router();
 
@@ -21,6 +17,13 @@ function genInviteCode() {
   let code = '';
   for (let i = 0; i < 7; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+function genUniqueInviteCode(db) {
+  for (let i = 0; i < 20; i++) {
+    const code = genInviteCode();
+    if (!db.prepare('SELECT 1 FROM leaderboards WHERE invite_code = ?').get(code)) return code;
+  }
+  throw new Error('Could not allocate a unique invite code');
 }
 function isMemberOrOrganizer(db, board, userId) {
   if (board.organizer_id === userId) return true;
@@ -32,7 +35,7 @@ router.post('/', authMiddleware, body('createLeaderboard'), (req, res) => {
     const { name, resetInterval, prize, includeSelf } = req.valid;
     const db = getDb();
     const id = uuid();
-    const inviteCode = genInviteCode();
+    const inviteCode = genUniqueInviteCode(db);
     const nextReset = calcNextReset(resetInterval || 'weekly');
     db.transaction(() => {
       db.prepare(`INSERT INTO leaderboards (id, name, reset_interval, prize, include_self, invite_code, organizer_id, next_reset)
@@ -61,12 +64,23 @@ router.get('/:id', authMiddleware, (req, res) => {
     board = resetIfDue(db, board);
 
     // NOTE: email is intentionally NOT selected (no PII leak to other members).
-    const members = db.prepare(`
+    const allMembers = db.prepare(`
       SELECT lm.leaderboard_id, lm.user_id, lm.role, lm.points, lm.streak, u.name, u.handle, u.avatar
       FROM leaderboard_members lm JOIN users u ON u.id = lm.user_id
       WHERE lm.leaderboard_id = ? ORDER BY lm.points DESC
     `).all(req.params.id);
-    const ranked = members.map((m, i) => ({ ...m, rank: i + 1, isYou: m.user_id === req.userId }));
+    const members = board.include_self ? allMembers : allMembers.filter(m => m.role !== 'organizer');
+    const ranked = members.map((m, i) => {
+      const isYou = m.user_id === req.userId;
+      const visible = maskDisplay(m, {
+        mode: board.display_mode,
+        isSelf: isYou,
+        nameKey: 'name',
+        handleKey: 'handle',
+        avatarKey: 'avatar',
+      });
+      return { ...visible, rank: i + 1, isYou };
+    });
     res.json({ leaderboard: board, members: ranked });
   } catch (err) {
     console.error('Get leaderboard error:', err);

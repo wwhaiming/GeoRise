@@ -302,6 +302,39 @@ function initTables() {
       detail TEXT DEFAULT '',              -- JSON
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS school_baselines (
+      leaderboard_id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS school_utility (
+      leaderboard_id TEXT PRIMARY KEY,
+      data TEXT NOT NULL,
+      source TEXT DEFAULT 'imported',
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS action_plan_items (
+      leaderboard_id TEXT NOT NULL,
+      item_key TEXT NOT NULL,
+      status TEXT DEFAULT 'proposed',
+      approved_by TEXT,
+      approved_at TEXT,
+      expected_kg REAL,
+      verify_by TEXT,
+      payload TEXT,
+      before_value REAL,
+      after_value REAL,
+      actual_pct REAL,
+      metric TEXT,
+      PRIMARY KEY (leaderboard_id, item_key),
+      FOREIGN KEY (leaderboard_id) REFERENCES leaderboards(id) ON DELETE CASCADE,
+      FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL
+    );
   `);
 }
 
@@ -334,6 +367,11 @@ function migrate() {
     ['trash_reports', 'derived_label', "TEXT DEFAULT ''"],
     ['consent_records', 'document_name', "TEXT DEFAULT ''"],
     ['consent_records', 'document_data', "TEXT DEFAULT ''"],
+    ['school_utility', 'source', "TEXT DEFAULT 'imported'"],
+    ['action_plan_items', 'before_value', 'REAL'],
+    ['action_plan_items', 'after_value', 'REAL'],
+    ['action_plan_items', 'actual_pct', 'REAL'],
+    ['action_plan_items', 'metric', 'TEXT'],
   ];
   for (const [table, col, type] of adds) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch (_) { /* exists */ }
@@ -371,8 +409,8 @@ function createIndexes() {
     CREATE INDEX IF NOT EXISTS idx_consent_board   ON consent_records(leaderboard_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_board     ON audit_log(leaderboard_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_audit_actor     ON audit_log(actor_user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_action_plan_board ON action_plan_items(leaderboard_id, status);
   `);
 }
 
 module.exports = { getDb };
-

@@ -162,7 +162,7 @@ test('data-subject rights: export returns everything, delete cascades and ends t
   assert.equal(me.status, 404, 'session no longer resolves to a user');
 });
 
-test('ce77219 revert: leaderboard does NOT mask names (FEED masking still applies — see next test)', async () => {
+test('pseudonymous board masks other leaderboard members while preserving self identity', async () => {
   const teacher = await newUser('Teach'); const s1 = await newUser('Maya Chen');
   const board = await makeBoard(teacher, 'Pseudo');
   await joinBoard(s1, board);
@@ -173,10 +173,9 @@ test('ce77219 revert: leaderboard does NOT mask names (FEED masking still applie
   const me = view.body.members.find(m => m.isYou);
   const other = view.body.members.find(m => !m.isYou);
   assert.equal(me.name, 'Maya Chen', 'you see your own real name');
-  // leaderboard-invite branch reverts the LEADERBOARD masking to ce77219 (raw names shown).
-  // NOTE: this is the intended privacy regression on this branch; the FEED is still masked.
-  assert.equal(other.name, 'Teach', 'leaderboard shows raw names on this branch (masking reverted)');
-  assert.ok(other.handle, 'leaderboard shows handle on this branch (masking reverted)');
+  assert.ok(/^[A-Z]\.([A-Z]\.)?$/.test(other.name), `other should be masked to initials, got "${other.name}"`);
+  assert.equal(other.handle, '', 'other member handle hidden when pseudonymous');
+  assert.equal(other.avatar, '', 'other member avatar hidden when pseudonymous');
 });
 
 test('pseudonymous board also masks poster names in the FEED (not just the leaderboard)', async () => {

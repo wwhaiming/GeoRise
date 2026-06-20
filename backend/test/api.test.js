@@ -38,7 +38,9 @@ async function newUser(name) {
 }
 const auth = (t) => ['Authorization', `Bearer ${t}`];
 async function makeBoard(u, name) {
-  return (await request(app).post('/api/leaderboards').set(...auth(u.token)).send({ name })).body;
+  const r = await request(app).post('/api/leaderboards').set(...auth(u.token)).send({ name });
+  assert.equal(r.status, 200, 'board creation succeeds: ' + JSON.stringify(r.body));
+  return r.body;
 }
 async function joinBoard(u, board) {
   return request(app).post(`/api/leaderboards/${board.id}/join`).set(...auth(u.token)).send({ inviteCode: board.inviteCode });
@@ -235,6 +237,9 @@ test('organizer keeps their board in the list even with includeSelf:false', asyn
   const list = await request(app).get('/api/leaderboards').set(...auth(a.token));
   assert.equal(list.status, 200);
   assert.ok(list.body.leaderboards.some(l => l.id === board.id), 'organizer must see their own board');
+  const standings = await request(app).get(`/api/leaderboards/${board.id}`).set(...auth(a.token));
+  assert.equal(standings.status, 200);
+  assert.equal(standings.body.members.length, 0, 'includeSelf:false excludes organizer from ranked standings');
 });
 
 test('ledger is idempotent per source (no double-credit on replay)', async () => {
@@ -273,4 +278,3 @@ test('eco post response carries AI evidence (integrity + breakdown)', async () =
   assert.equal(r.body.integrity.checks.aiVisionGate, 'verified', 'AI gate reported as verified');
   assert.ok(Array.isArray(r.body.breakdown), 'point breakdown present for the evidence panel');
 });
-

@@ -95,7 +95,7 @@ The LLM only appears in the *perceive* and *draft* boxes. Every box that touches
 ## Tech Stack
 
 - **Frontend:** React 19 + Vite · Vitest + Testing Library (11 UI tests)
-- **Backend:** Node.js + Express · Node built-in test runner (91 backend tests)
+- **Backend:** Node.js + Express · Node built-in test runner (108 backend tests)
 - **Database:** SQLite (via better-sqlite3) + **sqlite-vec** for vector KNN retrieval
 - **Auth:** JWT (httpOnly cookies) + bcrypt
 - **AI:** OpenAI vision (`ECO_MODEL`, default `gpt-4o-mini`) for eco analysis + a custom CNN (ONNX, val_acc 0.936) for offline trash detection. Without an `OPENAI_API_KEY` the server **rejects rather than fabricates** points; set `MOCK_ECO_ALWAYS_PASS=true` for a clearly-flagged demo.
@@ -215,7 +215,7 @@ ecorise/
 │   │   ├── seasons.js         Leaderboard season reset scheduler
 │   │   └── validate.js        Zod validation schemas
 │   ├── scripts/           seedDemo.js · seedCoachCorpus.js · loadSmoke.js
-│   ├── test/              91 tests (api · coach · privacy · carbon · eval)
+│   ├── test/              108 tests (api · coach · insights · privacy · carbon · eval)
 │   ├── db.js              SQLite schema + initialization (sqlite-vec extension)
 │   └── server.js          Express entry point
 │

@@ -28,6 +28,11 @@ const LINCOLN = require('../data/lincolnHigh');
 const fs = require('fs');
 const path = require('path');
 const EVAL_RESULTS = path.join(__dirname, '..', 'test', 'coach_eval', 'results.json');
+const TEST_RESULTS = path.join(__dirname, '..', 'test-results.json');
+
+async function readJsonFile(file) {
+  try { return JSON.parse(await fs.promises.readFile(file, 'utf8')); } catch { return null; }
+}
 
 const router = express.Router();
 // Direction B is the school's ENVIRONMENTAL footprint (energy/water/waste/transport/grounds).
@@ -67,13 +72,10 @@ router.get('/status', authMiddleware, async (req, res) => {
 // ── AI report card: serves the latest REAL eval-harness output (never hardcoded). ──
 // Regenerate with `npm run test:coach-eval`, which writes results.json. Honest about
 // being illustrative fixtures (the responsible-AI properties), not a third-party benchmark.
-router.get('/eval-report', authMiddleware, (req, res) => {
-  try {
-    if (!fs.existsSync(EVAL_RESULTS)) return res.json({ available: false });
-    res.json({ available: true, ...JSON.parse(fs.readFileSync(EVAL_RESULTS, 'utf8')) });
-  } catch (_) {
-    res.json({ available: false });
-  }
+router.get('/eval-report', authMiddleware, async (req, res) => {
+  const evalArtifact = await readJsonFile(EVAL_RESULTS);
+  if (!evalArtifact) return res.json({ available: false });
+  res.json({ available: true, ...evalArtifact });
 });
 
 // ── Sources (teacher/admin) ──
@@ -260,7 +262,20 @@ router.post('/preferences', authMiddleware, body('coachPrefs'), (req, res) => {
 const RESEARCH_PROVENANCE = 'research_dataset';
 // Memoize per-paper summary/visual (deterministic-ish, paid model calls) for the
 // process lifetime so re-opening a paper card doesn't re-bill the model.
-const _paperCache = new Map(); // `${kind}:${sourceId}` -> result
+const PAPER_CACHE_MAX = Math.max(10, Math.min(1000, Number(process.env.PAPER_CACHE_MAX) || 200));
+const _paperCache = new Map(); // bounded LRU: `${kind}:${sourceId}` -> result
+function paperCacheGet(key) {
+  if (!_paperCache.has(key)) return undefined;
+  const value = _paperCache.get(key);
+  _paperCache.delete(key);
+  _paperCache.set(key, value);
+  return value;
+}
+function paperCacheSet(key, value) {
+  if (_paperCache.has(key)) _paperCache.delete(key);
+  while (_paperCache.size >= PAPER_CACHE_MAX) _paperCache.delete(_paperCache.keys().next().value);
+  _paperCache.set(key, value);
+}
 
 // Ask a free-form question; the answer is pulled out of the most relevant papers.
 router.get('/ask', authMiddleware, async (req, res) => {
@@ -324,11 +339,12 @@ function loadPaper(db, id) {
 router.get('/papers/:id/summary', authMiddleware, async (req, res) => {
   try {
     const key = `summary:${req.params.id}`;
-    if (_paperCache.has(key)) return res.json({ summary: _paperCache.get(key) });
+    const cached = paperCacheGet(key);
+    if (cached !== undefined) return res.json({ summary: cached });
     const paper = loadPaper(getDb(), req.params.id);
     if (!paper) return res.status(404).json({ error: 'Paper not found' });
     const summary = await summarizePaper(paper);
-    _paperCache.set(key, summary);
+    paperCacheSet(key, summary);
     res.json({ summary });
   } catch (err) {
     console.error('coach /summary error:', err.message);
@@ -340,11 +356,12 @@ router.get('/papers/:id/summary', authMiddleware, async (req, res) => {
 router.get('/papers/:id/visual', authMiddleware, async (req, res) => {
   try {
     const key = `visual:${req.params.id}`;
-    if (_paperCache.has(key)) return res.json({ visual: _paperCache.get(key) });
+    const cached = paperCacheGet(key);
+    if (cached !== undefined) return res.json({ visual: cached });
     const paper = loadPaper(getDb(), req.params.id);
     if (!paper) return res.status(404).json({ error: 'Paper not found' });
     const visual = await paperVisual(paper);
-    _paperCache.set(key, visual);
+    paperCacheSet(key, visual);
     res.json({ visual });
   } catch (err) {
     console.error('coach /visual error:', err.message);
@@ -353,10 +370,6 @@ router.get('/papers/:id/visual', authMiddleware, async (req, res) => {
 });
 
 // ── School hidden-footprint (Direction B core) ──
-// Lazily ensure the additive baseline table; isolated from db.js init, no migration.
-function ensureFootprintTable(db) {
-  db.prepare("CREATE TABLE IF NOT EXISTS school_baselines (leaderboard_id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))").run();
-}
 function boardForUser(db, req) {
   const lb = String(req.query.leaderboardId || req.body?.leaderboardId || '').trim();
   if (!lb) return null;
@@ -374,17 +387,33 @@ const FOOTPRINT_QUERY = {
   water: 'water conservation use reduction',
 };
 
-// Save a teacher/organizer baseline for the board (only board members/organizers).
-router.post('/school-footprint', authMiddleware, async (req, res) => {
+// Save the organizer-managed institutional baseline for the board.
+router.post('/school-footprint', authMiddleware, (req, res) => {
   const db = getDb();
   const lb = boardForUser(db, req);
   if (!lb) return res.status(403).json({ error: 'Join or organize this board to set its footprint baseline.' });
-  ensureFootprintTable(db);
+  if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) {
+    return res.status(403).json({ error: 'Only the board organizer can set its footprint baseline.' });
+  }
   const b = req.body || {};
-  // Whitelist numeric inputs; everything else falls back to labeled defaults.
-  const keys = ['students', 'monthlyKwh', 'monthlyGasTherms', 'busMilesPerWeek', 'pctDrivenStudents', 'dailyMealsServed', 'landfillBagsPerWeek', 'monthlyWaterM3'];
+  // Whitelist and bound numeric inputs; omitted fields use labeled model defaults.
+  const bounds = {
+    students: 1e6,
+    monthlyKwh: 1e12,
+    monthlyGasTherms: 1e12,
+    busMilesPerWeek: 1e9,
+    pctDrivenStudents: 100,
+    dailyMealsServed: 1e7,
+    landfillBagsPerWeek: 1e7,
+    monthlyWaterM3: 1e12,
+  };
   const baseline = {};
-  for (const k of keys) if (Number.isFinite(+b[k])) baseline[k] = +b[k];
+  for (const [k, max] of Object.entries(bounds)) {
+    if (b[k] === undefined || b[k] === null || b[k] === '') continue;
+    const value = Number(b[k]);
+    if (!Number.isFinite(value) || value < 0 || value > max) return res.status(400).json({ error: `Invalid ${k}.` });
+    baseline[k] = value;
+  }
   db.prepare("INSERT INTO school_baselines (leaderboard_id, data, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(leaderboard_id) DO UPDATE SET data = excluded.data, updated_at = datetime('now')").run(lb, JSON.stringify(baseline));
   res.json({ success: true, footprint: estimateFootprint(baseline) });
 });
@@ -395,7 +424,6 @@ router.get('/school-insight', authMiddleware, async (req, res) => {
   try {
     const db = getDb();
     const lb = boardForUser(db, req);
-    ensureFootprintTable(db);
     let baseline = {};
     if (lb) {
       const row = db.prepare('SELECT data FROM school_baselines WHERE leaderboard_id = ?').get(lb);
@@ -597,15 +625,6 @@ function safeJsonArr(t) { try { const a = JSON.parse(t); return Array.isArray(a)
 // The reasoning layer over a school's own utility history: input -> AI -> insight -> action.
 // Falls back to the named "Lincoln High" sample when a board has not entered real data, so
 // the local, specific demo always works. Environmental scope only (no food/cafeteria).
-function ensureInsightTables(db) {
-  db.prepare("CREATE TABLE IF NOT EXISTS school_utility (leaderboard_id TEXT PRIMARY KEY, data TEXT NOT NULL, source TEXT DEFAULT 'imported', updated_at TEXT DEFAULT (datetime('now')))").run();
-  db.prepare("CREATE TABLE IF NOT EXISTS action_plan_items (leaderboard_id TEXT NOT NULL, item_key TEXT NOT NULL, status TEXT DEFAULT 'proposed', approved_by TEXT, approved_at TEXT, expected_kg REAL, verify_by TEXT, payload TEXT, before_value REAL, after_value REAL, actual_pct REAL, metric TEXT, PRIMARY KEY (leaderboard_id, item_key))").run();
-  // Additive migration for DBs created before the measured-outcome columns existed.
-  for (const col of ['before_value REAL', 'after_value REAL', 'actual_pct REAL', 'metric TEXT']) {
-    try { db.prepare(`ALTER TABLE action_plan_items ADD COLUMN ${col}`).run(); } catch { /* already present */ }
-  }
-  try { db.prepare("ALTER TABLE school_utility ADD COLUMN source TEXT DEFAULT 'imported'").run(); } catch { /* present */ }
-}
 function loadUtilitySeries(db, lb) {
   if (lb) {
     const row = db.prepare('SELECT data FROM school_utility WHERE leaderboard_id = ?').get(lb);
@@ -634,10 +653,9 @@ function summarizeInsights(school, anomalies, recs) {
   return parts.join(' ');
 }
 
-router.get('/insights', authMiddleware, (req, res) => {
+router.get('/insights', authMiddleware, async (req, res) => {
   try {
     const db = getDb();
-    ensureFootprintTable(db); ensureInsightTables(db);
     const lb = boardForUser(db, req);
     const { series, sample } = loadUtilitySeries(db, lb);
     let baseline = loadBaseline(db, lb);
@@ -676,9 +694,7 @@ router.get('/insights', authMiddleware, (req, res) => {
     };
     const evaluation = evalModel(series);
     const dataMode = (sourceRow && sourceRow.source === 'real') ? 'real' : 'synthetic';
-    // Machine-generated test evidence (written by `npm run test:evidence`), not a hardcoded claim.
-    let testArtifact = null;
-    try { testArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'test-results.json'), 'utf8')); } catch (_) { /* run the test suite to generate */ }
+    const testArtifact = await readJsonFile(TEST_RESULTS);
     res.json({
       school, sampleData: sample, profile: sample ? LINCOLN.profile : null,
       schoolContext: sample ? LINCOLN.context : null, scope, dataSource, dataMode,
@@ -727,7 +743,6 @@ router.post('/insights/load-demo', authMiddleware, (req, res) => {
     const lb = boardForUser(db, req);
     if (!lb) return res.status(403).json({ error: 'Join or organize this board to load demo data.' });
     if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) return res.status(403).json({ error: 'Only the board organizer can load demo data.' });
-    ensureFootprintTable(db); ensureInsightTables(db);
     db.prepare("INSERT INTO school_baselines (leaderboard_id, data, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(leaderboard_id) DO UPDATE SET data=excluded.data, updated_at=datetime('now')").run(lb, JSON.stringify(LINCOLN.baseline));
     // Set source='demo' (and reset it on conflict) so loading the synthetic sample over a
     // board that previously imported real data cannot leave dataMode falsely reading 'real'.
@@ -748,7 +763,11 @@ router.post('/insights/approve', authMiddleware, (req, res) => {
     if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) return res.status(403).json({ error: 'Only the board organizer (teacher) can approve an action.' });
     const itemKey = String((req.body && req.body.itemKey) || '').trim();
     if (!itemKey) return res.status(400).json({ error: 'itemKey is required.' });
-    ensureFootprintTable(db); ensureInsightTables(db);
+    const existing = db.prepare('SELECT status, verify_by, expected_kg FROM action_plan_items WHERE leaderboard_id = ? AND item_key = ?').get(lb, itemKey);
+    if (existing) {
+      if (existing.status === 'approved') return res.json({ success: true, itemKey, status: existing.status, verifyBy: existing.verify_by, expectedKgPerMonth: existing.expected_kg, alreadyApproved: true });
+      return res.status(409).json({ error: `Cannot re-approve an action while it is ${existing.status}.` });
+    }
     const { series } = loadUtilitySeries(db, lb);
     const footprint = estimateFootprint(loadBaseline(db, lb));
     const anomalies = detectAnomalies(series, { zThresh: 2 });
@@ -762,19 +781,20 @@ router.post('/insights/approve', authMiddleware, (req, res) => {
 });
 
 // Advance an approved action through its lifecycle (organizer only, audit-logged).
-// Closes the loop: requested -> approved -> in_progress -> verifying -> confirmed.
+// Confirmation is only written by /verify after a measured outcome is recorded.
 router.post('/insights/status', authMiddleware, (req, res) => {
   try {
-    const VALID = ['requested', 'approved', 'in_progress', 'verifying', 'confirmed'];
+    const NEXT = { approved: ['in_progress'], in_progress: ['verifying'] };
     const db = getDb();
     const lb = boardForUser(db, req);
     if (!lb) return res.status(403).json({ error: 'Join or organize this board.' });
     if (!db.prepare('SELECT 1 FROM leaderboards WHERE id = ? AND organizer_id = ?').get(lb, req.userId)) return res.status(403).json({ error: 'Only the board organizer can update an action status.' });
     const itemKey = String((req.body && req.body.itemKey) || '').trim();
     const status = String((req.body && req.body.status) || '').trim();
-    if (!itemKey || !VALID.includes(status)) return res.status(400).json({ error: 'itemKey and a valid status are required.' });
-    ensureInsightTables(db);
-    if (!db.prepare('SELECT 1 FROM action_plan_items WHERE leaderboard_id = ? AND item_key = ?').get(lb, itemKey)) return res.status(404).json({ error: 'Approve this action before advancing its status.' });
+    if (!itemKey || !['in_progress', 'verifying'].includes(status)) return res.status(400).json({ error: 'itemKey and a valid status are required.' });
+    const action = db.prepare('SELECT status FROM action_plan_items WHERE leaderboard_id = ? AND item_key = ?').get(lb, itemKey);
+    if (!action) return res.status(404).json({ error: 'Approve this action before advancing its status.' });
+    if (!(NEXT[action.status] || []).includes(status)) return res.status(409).json({ error: `Cannot move an action from ${action.status} to ${status}.` });
     db.prepare('UPDATE action_plan_items SET status = ? WHERE leaderboard_id = ? AND item_key = ?').run(status, lb, itemKey);
     auditLog(db, { actorUserId: req.userId, action: 'insights.status', targetType: 'action_plan_item', targetId: itemKey, leaderboardId: lb, detail: { status } });
     res.json({ success: true, itemKey, status });
@@ -794,6 +814,7 @@ router.post('/insights/import', authMiddleware, (req, res) => {
     if (rowsIn.length > 60) return res.status(400).json({ error: 'Too many rows (max 60 months).' });
     const numKeys = ['schoolDays', 'hdd', 'cdd', 'electricityKwh', 'gasTherms', 'waterGallons', 'busMiles', 'recyclingRatePct', 'contaminationPct'];
     const UTIL = ['electricityKwh', 'gasTherms', 'waterGallons'];
+    const bounded = { schoolDays: 31, recyclingRatePct: 100, contaminationPct: 100 };
     // Parse with per-row accept/reject so the UI can prove exactly what was kept and why
     // rows were dropped (a judge-visible CSV import proof, not a silent black box).
     const series = [];
@@ -801,22 +822,26 @@ router.post('/insights/import', authMiddleware, (req, res) => {
     const seenMonths = new Set();
     rowsIn.forEach((r, i) => {
       const rowNumber = i + 1;
-      const month = String((r && r.month) || '').trim().slice(0, 16);
-      if (!month) { rejected.push({ rowNumber, reason: 'missing month', raw: r }); return; }
-      if (seenMonths.has(month)) { rejected.push({ rowNumber, reason: `duplicate month ${month}`, raw: r }); return; }
+      const month = String((r && r.month) || '').trim();
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { rejected.push({ rowNumber, reason: 'month must use YYYY-MM' }); return; }
+      if (seenMonths.has(month)) { rejected.push({ rowNumber, reason: `duplicate month ${month}` }); return; }
       const out = { month };
-      let hasUtility = false; let negative = false;
+      let hasUtility = false; let invalid = '';
       for (const k of numKeys) {
-        const v = +r[k];
-        if (Number.isFinite(v)) { if (v < 0) negative = true; out[k] = v; if (UTIL.includes(k)) hasUtility = true; }
+        const supplied = r && r[k] !== undefined && r[k] !== null && r[k] !== '';
+        if (!supplied) continue;
+        const v = Number(r[k]);
+        if (!Number.isFinite(v) || v < 0 || v > 1e12 || (bounded[k] != null && v > bounded[k])) { invalid = `invalid ${k}`; break; }
+        out[k] = v;
+        if (UTIL.includes(k)) hasUtility = true;
       }
-      if (negative) { rejected.push({ rowNumber, reason: 'negative utility/value', raw: r }); return; }
-      if (!hasUtility) { rejected.push({ rowNumber, reason: 'no electricity/gas/water value', raw: r }); return; }
+      if (invalid) { rejected.push({ rowNumber, reason: invalid }); return; }
+      if (!hasUtility) { rejected.push({ rowNumber, reason: 'no electricity/gas/water value' }); return; }
       seenMonths.add(month);
       series.push(out);
     });
     if (series.length < 4) return res.status(400).json({ error: 'Need at least 4 valid months with a utility value (electricity/gas/water).', accepted: series.length, rejected });
-    ensureInsightTables(db);
+    series.sort((a, b) => a.month.localeCompare(b.month));
     // Top anomaly BEFORE (on the prior/sample series) vs AFTER (on the imported series) —
     // proves the engine re-runs on whatever data it is given, not a hardcoded result.
     const priorTop = detectAnomalies((loadUtilitySeries(db, lb).series) || [], { zThresh: 2 })[0] || null;
@@ -840,9 +865,10 @@ router.post('/insights/verify', authMiddleware, (req, res) => {
     const before = Number(req.body && req.body.before);
     const after = Number(req.body && req.body.after);
     const metric = String((req.body && req.body.metric) || '').slice(0, 160);
-    if (!itemKey || !Number.isFinite(before) || !Number.isFinite(after) || before <= 0) return res.status(400).json({ error: 'itemKey, a positive before value, and an after value are required.' });
-    ensureInsightTables(db);
-    if (!db.prepare('SELECT 1 FROM action_plan_items WHERE leaderboard_id = ? AND item_key = ?').get(lb, itemKey)) return res.status(404).json({ error: 'Approve this action before recording an outcome.' });
+    if (!itemKey || !Number.isFinite(before) || !Number.isFinite(after) || before <= 0 || after < 0) return res.status(400).json({ error: 'itemKey, a positive before value, and a non-negative after value are required.' });
+    const action = db.prepare('SELECT status FROM action_plan_items WHERE leaderboard_id = ? AND item_key = ?').get(lb, itemKey);
+    if (!action) return res.status(404).json({ error: 'Approve this action before recording an outcome.' });
+    if (!['approved', 'in_progress', 'verifying'].includes(action.status)) return res.status(409).json({ error: `Cannot record an outcome while action is ${action.status}.` });
     const actualPct = Math.round(((before - after) / before) * 1000) / 10;
     db.prepare("UPDATE action_plan_items SET before_value = ?, after_value = ?, actual_pct = ?, metric = ?, status = 'confirmed' WHERE leaderboard_id = ? AND item_key = ?").run(before, after, actualPct, metric, lb, itemKey);
     auditLog(db, { actorUserId: req.userId, action: 'insights.verify', targetType: 'action_plan_item', targetId: itemKey, leaderboardId: lb, detail: { before, after, actualPct, metric } });
@@ -853,4 +879,3 @@ router.post('/insights/verify', authMiddleware, (req, res) => {
 module.exports = router;
 module.exports.runDueCoachTips = runDueCoachTips;
 module.exports.inQuietHours = inQuietHours;
-

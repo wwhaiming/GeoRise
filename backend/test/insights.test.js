@@ -4,6 +4,11 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || ('insights-test-secret-' + 'x
 process.env.COACH_ENABLED = 'true';
 process.env.NODE_ENV = 'test';
 
+const path = require('path');
+const fs = require('fs');
+const DB = path.join(__dirname, 'test-' + process.pid + '.db');
+process.env.DATABASE_URL = DB;
+
 const test = require('node:test');
 const assert = require('node:assert');
 const request = require('supertest');
@@ -13,6 +18,13 @@ const { forecastNextMonth } = require('../utils/forecastEngine');
 const { recommend } = require('../utils/interventionModel');
 const { estimateFootprint } = require('../utils/footprintModel');
 const LINCOLN = require('../data/lincolnHigh');
+const { getDb } = require('../db');
+
+test.after(() => {
+  for (const file of [DB, DB + '-shm', DB + '-wal']) {
+    try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch { /* best-effort test cleanup */ }
+  }
+});
 
 // ── Engine unit tests (pure, deterministic) ──────────────────────────────────
 test('ols recovers known linear coefficients exactly', () => {
@@ -118,6 +130,21 @@ test('load-demo + approve: human-in-the-loop action plan, audit-logged, authz en
   assert.strictEqual(blocked.status, 403);
 });
 
+test('only the organizer can update a school footprint baseline and values are bounded', async () => {
+  const t = await signup('ins-baseline-org@t.co', 'Organizer');
+  const s = await signup('ins-baseline-student@t.co', 'Student');
+  const board = await request(app).post('/api/leaderboards').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ name: 'Baseline' });
+  const lb = board.body.id;
+  const joined = await request(app).post(`/api/leaderboards/${lb}/join`).set('Cookie', s.cookie).set('x-csrf-token', s.csrf).send({ inviteCode: board.body.inviteCode });
+  assert.strictEqual(joined.status, 200);
+  const blocked = await request(app).post('/api/coach/school-footprint').set('Cookie', s.cookie).set('x-csrf-token', s.csrf).send({ leaderboardId: lb, monthlyKwh: 999999 });
+  assert.strictEqual(blocked.status, 403);
+  const invalid = await request(app).post('/api/coach/school-footprint').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, monthlyKwh: -1 });
+  assert.strictEqual(invalid.status, 400);
+  const saved = await request(app).post('/api/coach/school-footprint').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, monthlyKwh: 25000 });
+  assert.strictEqual(saved.status, 200);
+});
+
 // ── Explainability + payload tests (the 100/100 UX surface) ──────────────────
 test('anomaly results are explainable: features, expected band, confidence %, not-enough-evidence', () => {
   const a = detectAnomalies(LINCOLN.series, { zThresh: 2 })[0];
@@ -162,8 +189,18 @@ test('action status lifecycle: advance-before-approve 404, organizer advances, i
   const ok = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'in_progress' });
   assert.strictEqual(ok.status, 200);
   assert.strictEqual(ok.body.status, 'in_progress');
+  const reapprove = await request(app).post('/api/coach/insights/approve').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key });
+  assert.strictEqual(reapprove.status, 409, 're-approval cannot reset an in-progress action');
   const bad = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'hacked' });
   assert.strictEqual(bad.status, 400, 'invalid status rejected');
+  const skip = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'confirmed' });
+  assert.strictEqual(skip.status, 400, 'confirmation requires a measured outcome');
+  const rollback = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'approved' });
+  assert.strictEqual(rollback.status, 400, 'lifecycle cannot move backwards');
+  const verifying = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'verifying' });
+  assert.strictEqual(verifying.status, 200);
+  const repeated = await request(app).post('/api/coach/insights/status').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, status: 'verifying' });
+  assert.strictEqual(repeated.status, 409, 'same-state replay is rejected');
 });
 
 test('GET /insights includes a holdout backtest (model validation)', async () => {
@@ -186,6 +223,17 @@ test('Real Data Mode: organizer imports utility readings; flips data source; sho
   assert.ok(/real/i.test(ins.body.dataSource));
   const short = await request(app).post('/api/coach/insights/import').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, readings: [{ month: 'x', gasTherms: 5 }] });
   assert.strictEqual(short.status, 400, 'needs >= 4 months');
+  const blank = await request(app).post('/api/coach/insights/import').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({
+    leaderboardId: lb,
+    readings: [1, 2, 3, 4].map(i => ({ month: `nonsense-${i}`, electricityKwh: '' })),
+  });
+  assert.strictEqual(blank.status, 400, 'malformed months and blank utilities are rejected');
+  assert.strictEqual(blank.body.accepted, 0);
+  const unsorted = LINCOLN.series.slice(0, 4).reverse();
+  const sortedImport = await request(app).post('/api/coach/insights/import').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, readings: unsorted });
+  assert.strictEqual(sortedImport.status, 200);
+  const stored = JSON.parse(getDb().prepare('SELECT data FROM school_utility WHERE leaderboard_id = ?').get(lb).data);
+  assert.deepStrictEqual(stored.map(r => r.month), stored.map(r => r.month).slice().sort(), 'stored readings are chronological');
   // non-member cannot import
   const s = await signup('ins-imp2@t.co', 'S');
   const blocked = await request(app).post('/api/coach/insights/import').set('Cookie', s.cookie).set('x-csrf-token', s.csrf).send({ leaderboardId: lb, readings: LINCOLN.series });
@@ -203,6 +251,8 @@ test('Measured outcome: approve -> verify computes actual % reduction and confir
   const pre = await request(app).post('/api/coach/insights/verify').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, before: 18.4, after: 15.9 });
   assert.strictEqual(pre.status, 404);
   await request(app).post('/api/coach/insights/approve').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key });
+  const negative = await request(app).post('/api/coach/insights/verify').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, before: 18.4, after: -2 });
+  assert.strictEqual(negative.status, 400, 'negative measurements are impossible and must be rejected');
   const v = await request(app).post('/api/coach/insights/verify').set('Cookie', t.cookie).set('x-csrf-token', t.csrf).send({ leaderboardId: lb, itemKey: key, before: 18.4, after: 15.9, metric: 'weekend therms/HDD' });
   assert.strictEqual(v.status, 200);
   assert.strictEqual(v.body.actualPct, 13.6);
