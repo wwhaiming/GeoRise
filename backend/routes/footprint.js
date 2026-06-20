@@ -65,17 +65,24 @@ router.get('/insights', authMiddleware, async (req, res) => {
       'SELECT * FROM fp_recommendations WHERE week_start = ? ORDER BY created_at'
     ).all(weekStart);
 
-    // If none exist yet for this week, insert the computed ones.
+    // If none exist yet for this week, insert the computed ones. Wrapped in a
+    // transaction that re-checks inside, so two concurrent first-loads of a new
+    // week cannot both seed the full set (better-sqlite3 serializes the txn).
     if (dbRecs.length === 0 && recommendations.length > 0) {
+      const selectRecs = db.prepare(
+        'SELECT * FROM fp_recommendations WHERE week_start = ? ORDER BY created_at'
+      );
       const ins = db.prepare(
         'INSERT INTO fp_recommendations (id, week_start, category, title, reasoning, estimated_impact, kg_co2e_per_year, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
       );
-      for (const r of recommendations) {
-        ins.run(uuid(), weekStart, r.category, r.title, r.reasoning, r.estimated_impact || '', r.kgCO2ePerYear || 0, 'proposed');
-      }
-      dbRecs = db.prepare(
-        'SELECT * FROM fp_recommendations WHERE week_start = ? ORDER BY created_at'
-      ).all(weekStart);
+      const seed = db.transaction(() => {
+        if (selectRecs.all(weekStart).length > 0) return; // another request already seeded
+        for (const r of recommendations) {
+          ins.run(uuid(), weekStart, r.category, r.title, r.reasoning, r.estimated_impact || '', r.kgCO2ePerYear || 0, 'proposed');
+        }
+      });
+      seed();
+      dbRecs = selectRecs.all(weekStart);
     }
 
     res.json({
@@ -96,12 +103,23 @@ router.get('/insights', authMiddleware, async (req, res) => {
   }
 });
 
+// A recommendation is an institutional action, so only school staff may act on it:
+// a teacher/admin (users.role) or a board organizer (the staff member who runs the
+// school's board). A plain member/student cannot approve or assign.
+function canManageRecommendations(db, userId) {
+  const role = db.prepare('SELECT role FROM users WHERE id = ?').get(userId)?.role;
+  if (role === 'teacher' || role === 'admin') return true;
+  return !!db.prepare('SELECT 1 FROM leaderboards WHERE organizer_id = ?').get(userId);
+}
+
 // ── POST /api/footprint/recommendations/:id/approve ──
-// Two-step gate: proposed → approved. Only the sustainability coordinator role
-// (or organizer of the board, approximated by any authenticated user for the demo)
-// may approve. A real deploy would add a role check here.
+// Two-step gate: proposed → approved. Restricted to a teacher/admin or a board
+// organizer (see canManageRecommendations); a student/member cannot self-approve.
 router.post('/recommendations/:id/approve', authMiddleware, (req, res) => {
   const db = getDb();
+  if (!canManageRecommendations(db, req.userId)) {
+    return res.status(403).json({ error: 'Only a teacher/admin or board organizer can approve recommendations.' });
+  }
   const rec = db.prepare('SELECT * FROM fp_recommendations WHERE id = ?').get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   if (rec.status === 'approved') return res.json({ ok: true, alreadyApproved: true, recommendation: rec });
@@ -122,6 +140,9 @@ router.post('/recommendations/:id/assign', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'assignedTo is required' });
   }
   const db = getDb();
+  if (!canManageRecommendations(db, req.userId)) {
+    return res.status(403).json({ error: 'Only a teacher/admin or board organizer can assign recommendations.' });
+  }
   const rec = db.prepare('SELECT id FROM fp_recommendations WHERE id = ?').get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
 
