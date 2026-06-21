@@ -5,15 +5,22 @@ import Icon from './Icon';
 import { METAL } from './constants';
 
 // ── Help Tip (? button → bottom sheet) ──
-export function HelpTip({ text }) {
+export function HelpTip({ text, children, label = 'More info' }) {
   const [open, setOpen] = useState(false);
 
   return (
     <span style={{ display: 'inline-flex', verticalAlign: 'middle', flexShrink: 0 }}>
-      <button type="button" onClick={e => { e.stopPropagation(); setOpen(true); }} aria-label="More info"
-        style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(45,91,57,.28)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
-        ?
-      </button>
+      {children ? (
+        <button type="button" onClick={e => { e.stopPropagation(); setOpen(true); }} aria-label={label}
+          style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', lineHeight: 0 }}>
+          {children}
+        </button>
+      ) : (
+        <button type="button" onClick={e => { e.stopPropagation(); setOpen(true); }} aria-label={label}
+          style={{ width: 18, height: 18, borderRadius: '50%', border: '1.5px solid rgba(45,91,57,.28)', background: 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: 'var(--text-dim)', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+          ?
+        </button>
+      )}
       {open && createPortal(
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, zIndex: 9990, background: 'rgba(12,17,14,.5)', backdropFilter: 'blur(2px)' }} />

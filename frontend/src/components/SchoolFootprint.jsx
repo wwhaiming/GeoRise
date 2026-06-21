@@ -98,9 +98,9 @@ export default function SchoolFootprint({ leaderboardId, showToast }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {i === 0 && (
-                    <span title="Biggest emitter — this category produces the most CO₂e of all your school's emission sources" style={{ display: 'flex', cursor: 'help' }}>
+                    <HelpTip label="Biggest emitter info" text={`Biggest emitter: ${c.label} produces the most CO₂e of all your school's emission sources, roughly ${Math.round(c.kgCO2ePerMonth).toLocaleString()} kg/mo. Acting on the largest line moves the school's total the most.`}>
                       <Icon name="flame" size={13} color="var(--coral)" />
-                    </span>
+                    </HelpTip>
                   )}{c.label}
                 </span>
                 <span className="tnum dim" title={`range ${c.low}–${c.high} kg/mo · ${c.factorName}`}>{Math.round(c.kgCO2ePerMonth).toLocaleString()} kg/mo</span>
