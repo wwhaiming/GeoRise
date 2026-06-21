@@ -13,6 +13,7 @@ const { imageHash, perceptualHash, hammingDistance } = require('../utils/imageHa
 const { body, pageParams } = require('../utils/validate');
 const analysisCache = require('../utils/analysisCache');
 const { boardPrivacy, consentSatisfied, applyRetention, auditLog, maskDisplay } = require('../utils/privacy');
+const { createNotification } = require('../utils/notify');
 
 const router = express.Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -212,6 +213,28 @@ router.post('/', authMiddleware, upload.single('image'), aiRateLimit, body('crea
         completed = CASE WHEN progress + 1 >= goal THEN 1 ELSE 0 END,
         awarded  = CASE WHEN progress + 1 >= goal THEN 1 ELSE awarded END WHERE id = ? AND user_id = ?`).run(matchedQuest.id, req.userId);
       questUpdate = questMatch;
+    }
+
+    // Bell: surface the verified action on the user's notifications. Best-effort —
+    // createNotification swallows its own errors so a bell write never fails a post.
+    // Only notify on a published post (held-for-review posts notify on approval).
+    if (!reviewRequired && result.points > 0) {
+      const actionLabel = derivedLabel || aiResult.actionType || 'an eco action';
+      createNotification(db, {
+        userId: req.userId, type: 'points',
+        message: `+${result.points} pts · ${actionLabel}`,
+        link: 'home',
+      });
+      // matchedQuest is the PRE-update row (fetched with completed = 0); recompute
+      // whether this verified action pushed it across its goal.
+      const questNowComplete = isQuestCompletion && (matchedQuest.progress + 1) >= matchedQuest.goal;
+      if (questNowComplete) {
+        createNotification(db, {
+          userId: req.userId, type: 'quest',
+          message: `Quest complete: ${matchedQuest.title} 🎯`,
+          link: 'quests',
+        });
+      }
     }
 
     // Photo committed; drop the cached analysis + fraud-screen so a fresh upload re-analyzes.

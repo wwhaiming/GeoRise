@@ -119,6 +119,24 @@ function seed() {
       VALUES (?, ?, ?, ?, ?, '', ?, ?, ?, ?)`);
     db.prepare('DELETE FROM quests WHERE user_id = ? AND date = ?').run(demo.id, today);
     for (const q of QUESTS) insQuest.run(uuid(), demo.id, q.title, q.description, q.action_type, q.points_base, q.goal, q.progress, today);
+
+    // Notifications for the demo user's bell. The feature is fully built (REST +
+    // UI) but only produces rows on live actions; seed a lived-in history so the
+    // bell shows real content (and an unread badge) the moment a judge logs in.
+    // Backfill with explicit read state + backdated created_at — newest first.
+    const ago = mins => new Date(Date.now() - mins * 60000).toISOString().slice(0, 19).replace('T', ' ');
+    const NOTIFS = [
+      { type: 'team',   read: 0, message: 'Garfield High crossed 7.8 kg CO₂e avoided together 🌍', link: 'footprint', mins: 4 },
+      { type: 'rank',   read: 0, message: "You climbed to #4 on Garfield High — up 1 spot!",       link: 'home',      mins: 38 },
+      { type: 'social', read: 0, message: 'Maya Chen liked your park cleanup 🧤',                   link: 'home',      mins: 120 },
+      { type: 'badge',  read: 1, message: 'Badge earned: 6-Day Streak 🔥',                          link: 'home',      mins: 60 * 22 },
+      { type: 'quest',  read: 1, message: 'Quest complete: Two-Wheel Tuesday 🎯',                   link: 'quests',    mins: 60 * 26 },
+      { type: 'points', read: 1, message: '+60 pts · Transport — Biked to campus',                  link: 'home',      mins: 60 * 27 },
+      { type: 'system', read: 1, message: 'Welcome to EcoRise! Log an eco action to climb the board.', link: 'home',   mins: 60 * 72 },
+    ];
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(demo.id);
+    const insNotif = db.prepare('INSERT INTO notifications (id, user_id, type, message, link, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const n of NOTIFS) insNotif.run(uuid(), demo.id, n.type, n.message, n.link, n.read, ago(n.mins));
   })();
 
   console.log('\n🌱 EcoRise demo seeded.');
