@@ -91,6 +91,32 @@ const FEED_THEME = {
   community: { c: '#6F8F72', c2: '#5D8F86', icon: 'users' },
 };
 
+// Topical photo keywords per feed theme. loremflickr matches the keyword, so a
+// transport post always gets a cycling/transit photo — relevance is guaranteed,
+// not luck. Multiple keywords per theme add variety across posts.
+const FEED_PHOTO_KW = {
+  transport: ['bicycle', 'cycling', 'commuter,bus'],
+  waste:     ['recycling', 'compost', 'reusable,bottle'],
+  food:      ['vegetables', 'salad', 'farmers,market'],
+  cleanup:   ['volunteer,cleanup', 'litter,cleanup', 'beach,cleanup'],
+  nature:    ['forest', 'trees', 'garden'],
+  energy:    ['solar,panel', 'wind,turbine', 'lightbulb'],
+  community: ['volunteer', 'community,garden', 'students'],
+};
+
+// Stable per-post topical photo. Deterministic: the same post id maps to the same
+// keyword AND the same `lock` seed, so the image never changes between re-renders
+// (no flicker). If the fetch ever fails, FeedCard's onError falls back to a gradient.
+function feedPhoto(post, themeKey) {
+  const pool = FEED_PHOTO_KW[themeKey] || FEED_PHOTO_KW.nature;
+  const id = String(post.id || post.action_desc || 'x');
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const kw = pool[h % pool.length];
+  const lock = (h % 9973) + 1; // stable, non-zero seed
+  return `https://loremflickr.com/800/480/${kw}?lock=${lock}`;
+}
+
 function FeedCard({ post, ctx }) {
   const [menu, setMenu] = useState(false);
   const [showC, setShowC] = useState(false);
@@ -121,10 +147,13 @@ function FeedCard({ post, ctx }) {
       </div>
       {/* photo, or a designed action-typed gradient when there's no image */}
       {(() => {
-        const hasPhoto = !imgErr && !!post.image && (post.image.startsWith('data:') || post.image.startsWith('http'));
         const t = (post.action_type || '').toLowerCase();
         const key = Object.keys(FEED_THEME).find(k => t.includes(k)) || 'nature';
         const th = FEED_THEME[key];
+        // Use the post's own image if it has one, else a topical photo by theme.
+        const photo = (post.image && (post.image.startsWith('data:') || post.image.startsWith('http')))
+          ? post.image : feedPhoto(post, key);
+        const hasPhoto = !imgErr && !!photo;
         return (
           <div style={{
             position: 'relative', height: hasPhoto ? 230 : 168, overflow: 'hidden',
@@ -132,7 +161,7 @@ function FeedCard({ post, ctx }) {
             background: hasPhoto ? undefined
               : `radial-gradient(130% 120% at 86% -12%, ${th.c}33, transparent 55%), radial-gradient(110% 110% at 0% 120%, ${th.c2}28, transparent 55%), linear-gradient(150deg, #f7faf5, #dde8de)`,
           }}>
-            {hasPhoto && <img src={post.image} alt={post.action_desc || 'Eco action'} onError={() => setImgErr(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+            {hasPhoto && <img src={photo} alt={post.action_desc || 'Eco action'} loading="lazy" onError={() => setImgErr(true)} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
             {!hasPhoto && <Icon name={th.icon} size={158} color={th.c} strokeWidth={1.4} style={{ position: 'absolute', right: -16, bottom: -26, opacity: .16, transform: 'rotate(-8deg)' }} />}
             <div style={{ position: 'absolute', inset: 0, background: hasPhoto ? 'linear-gradient(180deg, transparent 45%, rgba(0,0,0,.5))' : 'linear-gradient(180deg, transparent 45%, rgba(255,255,255,.66))' }} />
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
@@ -333,7 +362,10 @@ export function Leaderboard({ ctx, isCombined }) {
   );
 
   return isCombined ? (
-    <div style={{ paddingBottom: 12 }}>{content}</div>
+    // position+low zIndex traps this subtree's backdrop-filter cards in their own
+    // stacking context BELOW the Home header (zIndex 100), so the notifications
+    // dropdown renders on top instead of behind these cards (Chromium backdrop-filter quirk).
+    <div style={{ paddingBottom: 12, position: 'relative', zIndex: 1 }}>{content}</div>
   ) : (
     <div className="screen-in" style={{ paddingBottom: 24 }}>
       {content}
