@@ -75,20 +75,6 @@ export function LogAction({ ctx }) {
     : 0;
   const pts = aiResult ? (aiResult.requiresFollowUp ? Math.max(10, Math.round(co2 * 25)) : Math.round((aiResult.estimatedCO2Saved || 1) * 25)) : 0;
 
-  if (ctx.isDemo) return (
-    <Sheet title="Log an eco action" onClose={ctx.closeModal}>
-      <div style={{ padding: '24px 20px', display: 'grid', gap: 14, textAlign: 'center' }}>
-        <Icon name="flag" size={32} color="var(--green)" style={{ margin: '0 auto' }} />
-        <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 18 }}>Demo account</div>
-        <div className="muted" style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.5 }}>
-          Posting is disabled in demo mode. Log out and create your own free account to log eco actions, earn points, and compete with friends.
-        </div>
-        <button className="btn btn-primary btn-block" onClick={ctx.logout}>Log out &amp; create account</button>
-        <button className="btn btn-secondary btn-sm" onClick={ctx.closeModal}>Close</button>
-      </div>
-    </Sheet>
-  );
-
   return (
     <>
       <Sheet title="Log an eco action" onClose={ctx.closeModal}>
