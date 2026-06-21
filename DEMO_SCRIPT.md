@@ -104,107 +104,123 @@ COACH_ENABLED=true npm run demo
   surface the school's hidden footprint and show students where their effort actually counts."*
 - **ON-SCREEN TEXT:** `1.2 kg  vs  186,000 kg / month`   ·   `built for the eco / env-science classroom`
 
-### Scene 2 · 0:30 – 1:10 · Honest data, and a footprint that improves
-- **SCREEN:** Click the Electricity row, pause. Click the Heating (gas) row, pause. Click the **LOW**
-  confidence label, hold. Then click **Update school data** and enter real local inputs for **meals
-  per day, commute share, and water** (energy is already pre-seeded). **Save**, and hold on the
-  overall confidence chip as it climbs from **LOW to MEDIUM**. *(The model needs at least four of six
-  categories provided to reach MEDIUM, so enter all three, not just meals.)*
-- **VO:** *"A class can trust this because it is honest about its data. The electricity and gas
-  figures, about 82 tonnes, are real, pulled straight from Seattle Public Schools' public utility
-  dashboard. The other categories are national-average estimates from the EPA, and the app says so:
-  overall confidence reads low on purpose. But it is not stuck there. When the class adds real local
-  numbers for meals, commuting, and water, four of six categories move from defaults to school data,
-  and the confidence climbs from low to medium. It is a live lesson in measurement and uncertainty,
-  not a black box."*
+### Scene 2 · 0:30 – 1:05 · Honest data, and a footprint that improves
+- **SCREEN:** *Keep the static chart short so the first minute does not sit on one screen: 2 beats on the chart, then move to the input view.* Pre-roll on the Footprint Dashboard, ① Input data / RawDataChart in view, cursor parked in neutral space. (Confirm the rows / chip / form below render in the live build first; see the capture guide map flag for Scene 2.)
+  1. Click once across the **Electricity / Heating (gas)** rows, both framed in one zoom. Hold 1.5s. ("about 82 tonnes, are real.")
+  2. Click the **LOW** confidence label (on the LOW text itself, not whitespace). Hold 1.5s. ("confidence reads low on purpose.")
+  3. Click **Update school data** — the screen change, ~12s in. Hold 1.5s while the input view opens. Every beat after this lives on the new view.
+  4. Enter **meals per day → commute share → water** in one smooth pass (energy is pre-seeded; do not touch it). All three are required, or the chip will not reach MEDIUM.
+  5. Click **Save**, then freeze; do not chase the result with the cursor.
+  6. Hold 2s on the overall confidence chip as it climbs **LOW → MEDIUM**. End frame.
+  - *Scroll:* at most one, before beat 1, to center the energy rows. *(MEDIUM needs ≥4 of 6 categories on real data, so enter all three inputs, not just meals.)*
+  - *Before filming, record the exact tested input values so the take is repeatable:* meals/day `___`, commute share `___%`, water `___`. If these fields do not render in the live build, do not film Scene 2 as written.
+- **VO:** *"A class can trust this because EcoRise shows what is measured and what is estimated.
+  Electricity and gas, about 82 tonnes a month, come from Seattle Public Schools' public utility
+  dashboard. Food, commuting, waste, and water start as EPA estimates, so confidence says LOW on
+  purpose. Then the class adds real local inputs for meals, commuting, and water. The confidence rises
+  to MEDIUM: a live lesson in measurement, uncertainty, and better data."*
 - **ON-SCREEN TEXT:** `Energy = measured public data` · `add real inputs → confidence LOW → MEDIUM`
 
-### Scene 3 · 1:10 – 1:45 · The leverage ratio (the core idea)
-- **SCREEN:** Scroll once to center the **Action leverage** panel. Click the leverage message and
-  hold through the first sentence. End centered on that computed comparison.
-- **VO:** *"This next idea is what the whole product is built around, and we call it the leverage
-  ratio. Instead of asking students to guess what matters, EcoRise weighs one student's action
-  against the school's institutional emissions and computes the gap. Small actions still matter, but
-  the class can see exactly when student effort is best aimed at changing the system around them,
-  because the largest lever in a school is almost never individual. It is institutional. So the
-  obvious question for the class becomes, what should the school actually do."*
-- **ON-SCREEN TEXT:** `Leverage: one student action  vs  the school's biggest line`
+### Scene 3 · 1:05 – 1:35 · The leverage ratio (the core idea)
+- **SCREEN:** Pre-roll on the School Footprint card in post-Scene-2 state: confidence chip on **MEDIUM**, "Update school data" wizard **closed**, category bars rendered with the top bar coral + flame-marked. Cursor near vertical center. (The "Action leverage" panel = green-tinted box, "Action leverage" eyebrow, one muted message line, seated below the bars and above the "Next step" card; `frontend/src/components/SchoolFootprint.jsx` ~L113-119.)
+  1. One scroll down to center the **Action leverage** panel, then stop.
+  2. Click the muted **leverage message** line (the text itself, not the eyebrow or padding). Hold 1.5s. ("we call it the leverage ratio.")
+  3. Click the **top coral category bar** (flame-marked biggest emitter, first row) or its kg/mo value. Hold 1.5s. ("against the school's institutional emissions.")
+  4. Click the **leverage message** line again. Hold 1.5s through the close ("what should the school actually do"). End frame.
+  - *Scroll:* exactly one (beat 1). Do not click the "Next step" card or the confidence chip.
+- **VO:** *"EcoRise turns that gap into the leverage ratio. It compares one student action with the
+  school's largest emissions line, so the class can see when personal effort is best aimed at changing
+  the system around them. Small actions still matter. But the biggest school lever is usually
+  institutional, not individual. Once students can see that, the next question becomes concrete: what
+  should the school do first?"*
+- **ON-SCREEN TEXT:** `Leverage: one student action vs the largest school emissions line`
 
-### Scene 4 · 1:45 – 2:35 · From insight to decision (the decision engine + governance)
-- **SCREEN:** From the Home screen, open the **School Hidden Footprint** card, which now leads directly
-  into the **AI Insights** action plan, so the deepest analysis in the product sits one tap from the
-  landing screen. On the top ranked action, click `~X kg/mo`, pause. Click its **cost band · effort** line, pause. Click **Verify by:
-  <metric>**, pause. Click the **status chips** (proposed → approved → verified), pause. Click
-  **Approve** on one action, then on the now-approved action click into the **record measured
-  before/after** row so the verification step is visible.
-- **VO:** *"This is where the leverage idea becomes a decision rather than a slogan. EcoRise ranks
-  concrete institutional actions by how much carbon each one avoids per month, and for every action
-  it shows the cost band, the effort, the staff role that owns it, and the exact metric the class
-  would check to confirm it worked. Once a fix is approved, staff record the real before and after,
-  so students see measured outcomes, not just predictions. And the wording is AI-drafted but not
-  AI-trusted. To put it plainly, the AI retrieves evidence and drafts language. It does not compute
-  the emissions, award the points, approve the action, or publish anything. Each action stays a
-  proposal until a named staff member signs off."*
-- **ON-SCREEN TEXT:** `ranked by CO₂e/mo · cost · effort · verify-by · owner` · `human-approved · measured`
+### Scene 4 · 1:35 – 2:20 · From insight to decision (the decision engine + governance)
+- **SCREEN:** Pre-roll on the **Home** screen, School Footprint Card visible (✨ sparkle badge, green "AI Insights" eyebrow, "School Hidden Footprint" heading, "Anomalies · Predictions · Recommendations" subtitle, → button). Section ④ must render ≥1 RecommendationCard in the "Proposed — awaiting approval" state. (The card has **no** kg/mo headline, **no** cost-band, **no** "Verify by", and **no** before/after row — use the real elements below; do not hunt for those.)
+  1. Click the **"School Hidden Footprint"** heading → navigates to the FootprintDashboard. Hold 1.5s.
+  2. One scroll to center section ④ + the top RecommendationCard, then click its **recommendation title**. Hold 1.5s. ("ranks.")
+  3. Click the **"Projected annual CO₂e avoided: N kg"** badge (the green number). Hold 1.5s. ("how much carbon each one avoids.")
+  4. Click the **"Estimated impact:"** badge. Hold 1s. (covers "the cost band, the effort.")
+  5. Click the **"Why:"** reasoning box. Hold 1.5s. ("the AI retrieves evidence and drafts language.")
+  6. Click the **"Proposed — awaiting approval"** status chip. Hold 1s. ("stays a proposal until…")
+  7. Click **"✓ Approve — Make Active Goal"**. Hold 1.5s as the card flips to green "✓ Approved — active school goal" / "Active — visible on school leaderboard feed". ("a named staff member signs off.")
+  8. Click the now-green **"✓ Approved — active school goal"** chip. Hold 1.5s. End frame (covers "measured outcomes, not just predictions").
+  - *Scroll:* exactly one (beat 2). Do not open the Assign flow.
+- **VO:** *"This is where leverage becomes a decision. EcoRise ranks institutional actions, shows
+  projected annual CO₂e avoided, gives an estimated-impact badge, and explains the reasoning in a Why
+  box. The AI can draft the case, but it cannot approve the goal or publish it. The card stays Proposed
+  until staff click Approve. Then it becomes an active school goal, visible on the leaderboard feed. The
+  governance rule is simple: AI proposes, people approve, and the class can track what actually
+  changes."*
+- **ON-SCREEN TEXT:** `projected CO₂e avoided · estimated impact · why` · `proposed → staff-approved active goal`
 
-### Scene 5 · 2:35 – 3:25 · The research paper bank (the class's AI-powered library)
-- **SCREEN:** Open the **Research** tab. Click **Browse** and hold on the list of papers; click Browse
-  again so a fresh set loads. Click the **Ask a question…** box and ask an in-domain question such as
-  **`Does biking instead of driving meaningfully cut emissions?`**; hold on the cited answer. Then on
-  one paper click **Summarize** (hold on the plain-language key points), and **Visual** (hold on the
-  infographic the AI extracts).
-- **VO:** *"And the class is not learning in a vacuum. This is a research library of a thousand real
-  papers built right into the app. Students can browse it, or ask a question and get an answer drawn
-  only from those papers, always shown with its citation. They can have the AI summarize a dense
-  study into plain-language key points, or turn it into a diagram of cause and effect. For an
-  environmental-science class, that is a primary-source research bank with an AI tutor on top, so the
-  footprint they are looking at is backed by the actual literature."*
+### Scene 5 · 2:20 – 3:05 · The research paper bank (the class's AI-powered library)
+- **SCREEN:** Pre-roll on the **Learning hub → Research Library** sub-tab (toggle pill: "Research Library" active, "AI Coach" inactive). Visible: green eyebrow "Research library · 1,000 papers", the "Ask the research" card ("Ask a question…" input + "Ask" button), and "Search papers…" + "Browse" + topic chips. Papers list empty at pre-roll so the first Browse visibly populates it.
+  1. Click **Browse**. Hold 1.5s as the `{total} matching papers` line + list load. ("browse it.")
+  2. Click **Browse** again (cursor already on it). Hold 1.5s, until at least the first two paper titles visibly change. (corpus-depth proof; no key word.) If the list does not visibly swap on 1080×1920 mute playback, cut this beat.
+  3. Click the **"Ask a question…"** input. Hold 1s; let the zoom settle before typing.
+  4. Type `Does biking instead of driving meaningfully cut emissions?`, click **Ask**. Hold 1.5s until the green answer card renders.
+  5. Click the **citation chip** (leaf-icon source chip in the "Cite" row under the answer — the chip, not the answer text). Hold 1.5s. ("always shown with its citation.")
+  6. Scroll once to center the first PaperCard, click **Summarize** (leaf icon). Hold 1.5s for the green key-points box.
+  7. Click **Visualize** (sparkle icon, right of Summarize). Hold 1.5s for the gradient infographic.
+  - *Scroll:* exactly one (between beats 5 and 6). Labels: it is "Visualize" (not "Visual"), and a Learning sub-tab (not a top-level "Research" tab).
+- **VO:** *"The class is not learning in a vacuum. EcoRise includes a library of 1,000 real research
+  papers. Students can browse the corpus, ask a question, and get an answer drawn only from those
+  papers, with the citation visible. They can turn a dense study into plain-language key points, then
+  into a cause-and-effect visual. For environmental science, that means the footprint conversation sits
+  on top of primary sources, not a generic chatbot."*
 - **ON-SCREEN TEXT:** `1,000 real research papers` · `ask · summarize · visualize` · `every answer cited`
 
-### Scene 6 · 3:25 – 4:00 · The proof: the AI says nothing (responsible AI for the classroom)
-- **SCREEN:** Still on the Research tab, click the **Ask a question…** box and ask a question outside
-  the corpus: **`Who won the 2022 World Cup?`**, submit, and when **"No grounded answer found in the
-  corpus."** appears, **do nothing for 4 full seconds.** *(Optional harder probe, rehearse first: ask
-  `What exact percent will meatless Mondays cut our school's emissions?` and show it refuse rather than
-  invent a number; if it ever answers, drop it.)* Then click-zoom the eval report card: faithfulness,
-  citation validity, refusal rate, hallucination rate.
-- **VO:** *"Here is what makes it safe to put in front of a class. Ask it something outside its
-  evidence and it does not improvise an answer. It refuses, because the AI is allowed to say nothing.
-  The same gate that just turned this question away is what keeps every grounded answer honest. And we
-  measure it. This is a small, illustrative eval set, not a giant benchmark, but it reports
-  faithfulness, citation validity, refusal rate, and hallucination rate, and the whole thing is
-  re-runnable, so a teacher can see the failures too, not just the wins."*
+### Scene 6 · 3:05 – 3:45 · The proof: the AI says nothing (responsible AI for the classroom)
+- **SCREEN:** Stay on the **Research Library** sub-tab, "Ask a question…" input empty, no answer card lingering from Scene 5. The **AI Report Card** (eyebrow "AI report card"; metrics grid: Faithfulness pass · Citation validity · Unanswerable refusal · Refusal precision · Hallucination rate) sits below the fold.
+  1. Click the **"Ask a question…"** input. Hold 1s.
+  2. Type `Who won the 2022 World Cup?`, submit (Enter). Keep the cursor still.
+  3. When **"No grounded answer found in the corpus."** (or the app's actual refusal copy) renders, **do nothing for 4 full seconds** — no move, click, or scroll. Emotional center; "nothing" lands here.
+  4. *(Optional, rehearse first:)* re-ask `What exact percent will meatless Mondays cut our school's emissions?`, hold 3s on the refusal. Drop the beat entirely if it ever invents a number.
+  5. One scroll to center the **AI Report Card**, settle 1s.
+  6. Click the **"Faithfulness pass"** row. Hold 1.5s. ("faithfulness.")
+  7. Click the **"Citation validity"** row. Hold 1.5s. ("citation validity.")
+  8. Click the **"Unanswerable refusal"** row (= the script's "refusal rate"). Hold 1.5s. ("refusal rate.")
+  9. Click the **"Hallucination rate"** row. Hold 1.5s. End frame. ("hallucination rate.")
+  - *Scroll:* exactly one (beat 5). Capture the literal refusal string the build renders, not the script's wording if they differ.
+- **VO:** *"This is the safety proof. Ask something outside the research bank, and EcoRise does not
+  improvise. It refuses, because the AI is allowed to say nothing. The same gate protects grounded
+  answers. And it is measured: faithfulness, citation validity, refusal behavior, and hallucination
+  rate on a small, re-runnable eval set. Teachers can see the failures, not just the wins."*
 - **ON-SCREEN TEXT:** `"The AI is allowed to say nothing."` · `measured on a re-runnable eval set`
 
-### Scene 7 · 4:00 – 4:35 · The student side closes the loop
-- **SCREEN:** Click **Log action**, pause. Click the upload control (photo pre-selected). After it
-  submits, click-zoom two things only: the **AI-detected** label with the carbon math, and the
-  **points awarded**. Open the **Feed** tab and hold for two seconds on the post that this action just
-  created, which now appears with a real action photo so the community side of the loop is visible.
-  Open the **notifications bell** on the Home header and hold on the points entry that the same action
-  generated. Then click **Quests** and click the top quest tied to the biggest emitter.
-- **VO:** *"Students still take action, and it has to be just as honest as everything else. When
-  someone logs an action, a vision model identifies the photo, but the kilograms come from the same
-  cited factor, and the points are scored on the server. The AI can describe an action, but it can
-  never award itself a single point. Once the action is verified, it surfaces in the class feed with its
-  own photo, and the student receives a notification for the points that were awarded, so the journey
-  from a logged action to public recognition stays visible to everyone in the class. And the quests the
-  class sees are ranked by the school's biggest emitter, so the footprint decides what students are
-  asked to do, rather than the other way around."*
+### Scene 7 · 3:45 – 4:35 · The student side closes the loop
+- **SCREEN:** Pre-roll on **Quests** (or Home with the Quests section in view). The **"Log action"** card (camera icon, green, Quick Actions Grid) centered. **Photo upload is an edited insert:** use a seeded demo image path or a drag-drop test fixture so no OS picker appears, or cut from the upload click straight to the analyzing state — if the OS file-picker shows in the raw take, that take is unusable. Bell carries seeded unread history; Feed shows topical photos.
+  1. Click the **"Log action"** card. Hold 1.5s as the "Log an eco action" modal slides up.
+  2. Click the photo upload control ("Add a photo to log your action") → spinner "Analyzing your photo…". Hold 1.5s; no second click during the spinner.
+  3. Click the **"AI detected"** eyebrow / action headline in the AI Detected Card. Hold 1.5s. ("a vision model identifies the photo.")
+  4. Click the **"CO₂ saved"** value (green number, "CO₂ SAVED" label). Hold 1.5s. ("the kilograms come from the same cited factor.")
+  5. Click **"Post"** to submit; if a points value renders, click it. Hold 1.5s. ("scored on the server… never award itself a single point.") If no in-modal points element, defer the points click to beat 6.
+  6. Click the **"Feed"** tab (bottom nav, right group). Hold 2s on the new post's Media Band photo (click the Points chip top-right if points were deferred).
+  7. Go to the **Home header** (avatar top-left / Home tab), click the **notifications bell** (top-right). Hold 1.5s on the points entry (green unread dot, "Xm ago").
+  8. Click **Quests** → the **top QuestCard** (biggest-emitter quest, yellow "2× [base points]" chip). Hold 1.5s. End frame.
+  - *Scroll:* at most one (Feed centering in beat 6, only if the new post is not already at top). Each navigation is its own deliberate beat — do not chain Feed→Home→bell→Quests.
+- **VO:** *"Students still take action, but the math stays accountable. When they log a photo, vision
+  identifies the action; the CO₂ saved comes from a cited factor, and points are scored on the server.
+  After posting, the action appears in the Feed with its own photo and triggers a points notification.
+  The quests then point students back to the school's biggest emitter, so the footprint drives the
+  challenge, not the other way around."*
 - **ON-SCREEN TEXT:** `vision detects · math is deterministic · points scored server-side`
 
 ### Scene 8 · 4:35 – 5:00 · Impact, scale, and the close
-- **SCREEN:** Start on the Footprint card and click the `≈186 t CO₂e / mo` headline, pause. One
-  navigation click into the Privacy center, click its student-data headline, pause. Return to the
-  Footprint card and click the `≈186 t CO₂e / mo` headline again for the final line. End with the
-  number centered, not mid-transition.
-- **VO:** *"For an environmental-science class, EcoRise pulls it all together. Students get a real
-  footprint and a thousand-paper research bank. Teachers get an auditable, cited baseline and an
-  approval gate. And it is built around student-data privacy from the start. It works for one
-  classroom today, and a district is simply the same pipeline repeated. One point two kilograms
-  against 186 tonnes. EcoRise makes the class see that difference, and makes the AI cite its sources
-  before it ever recommends a fix."*
-- **ON-SCREEN TEXT:** `EcoRise: the hidden footprint, grounded in real research, for the eco classroom.`
+- **SCREEN:** Pre-roll on the **School Footprint Card** with the real tonnes value showing (`hasBaseline` satisfied, not "Estimating…" or zeroed): "School footprint" eyebrow, large `≈186t` headline, "CO₂e / mo" label, confidence chip + help tooltip, coral category bars below. Cursor in lower-third neutral space.
+  1. Click the **`≈186t`** tonnes figure itself (not the "CO₂e / mo" label, chip, or tooltip). Hold 2s. ("footprint.")
+  2. **Insert (or navigate) into the Privacy & data screen.** If Privacy is only reachable via Profile, do not film the Profile routing — cut from the headline straight to the Privacy & data screen already loaded. Otherwise click the in-context Privacy entry (→ `/privacy`). Let the transition finish; no zoom commit mid-transition.
+  3. Click the **"Privacy & data"** h1 (the heading under the "FERPA & COPPA" eyebrow). Hold 1.5s. ("privacy.")
+  4. **Cut / navigate back** to the Footprint card (an edited cut is fine here). Let it re-seat, headline visible and not mid-animation.
+  5. Click the **`≈186t`** figure again. Hold 2.5s — "186 tonnes" lands as the zoom settles; hold through "cite its sources." End on this dead-still frame.
+  - *Scroll:* none. Only two navigations total (into Privacy, back to Footprint); no third route.
+- **VO:** *"EcoRise pulls the class view together: one real school footprint, a 1,000-paper research
+  bank, cited AI support, and a staff approval gate. It is built around student-data privacy from the
+  start. One classroom can use it today; a district is the same pipeline repeated. One point two
+  kilograms against 186 tonnes. EcoRise makes that gap visible, then makes every AI recommendation cite
+  its source."*
+- **ON-SCREEN TEXT:** `Hidden footprint. Real research. Cited fixes.`
 
 ---
 
@@ -335,27 +351,26 @@ Captions appear only on settled frames and never overlap a cursor move or a zoom
 
 ### Scene 2
 
-**Goal.** Make the viewer feel that this AI is trustworthy because it is honest about what it knows: the energy numbers are real and measured, the rest are flagged estimates, the overall confidence openly reads LOW, and the moment a class adds real local inputs the confidence visibly climbs from LOW to MEDIUM. The clip must land as measurement and uncertainty shown live, not as a polished black box.
+**Goal.** Make the viewer feel that this AI is trustworthy because it is honest about what it knows: the energy numbers are real and measured, the rest are flagged estimates, the overall confidence openly reads LOW, and the moment a class adds real local inputs the confidence visibly climbs from LOW to MEDIUM. The clip must land as measurement and uncertainty shown live, not as a polished black box. Keep it moving: the static chart gets only two quick beats, then the scene shifts to the data-entry view, so the opening minute (Scene 1 plus this scene) is not spent staring at one screen.
 
 **Pre-roll state.** Open on the Footprint Dashboard reached from the Home "School Hidden Footprint" card, with the "[School Name] — Weekly Insights" header and the Status Chips row visible. The ① Input data section with the RawDataChart ("Raw school data," "Last 10 school days · all buildings combined") must be in view at the top, since this is the honest-data anchor. Park the cursor at rest in neutral space, not hovering any interactive element.
 
 [Map flag: the Electricity row, Heating (gas) row, LOW confidence chip, "Update school data" button, the meals/commute/water input fields, and the "Save" that drives LOW to MEDIUM are not in the authoritative UI map. The map's Footprint Dashboard has no per-category energy rows, no confidence chip, and no data-entry form. These elements either live in a newer build state or a sub-panel the map did not capture. Confirm they render in the live build before capture. If they do not exist on screen at capture time, this scene cannot be shot as written and must go back to the script owner. The choreography below assumes they render as described, and every named click must hit the real element, never nearby whitespace.]
 
-**Cursor and click choreography.** Apply the golden rhythm on every beat. Default hold is 1 to 1.5 seconds unless stated.
+**Cursor and click choreography.** Apply the golden rhythm on every beat. Default hold is 1 to 1.5 seconds unless stated. The static chart gets only beats 1 and 2; by beat 3 the scene moves to the data-entry view, so the chart never dominates the first minute.
 
-1. Move in one arc to the Electricity row and click it once. Hold 1.5 seconds. The voiceover bed "the electricity and gas figures" begins as the zoom settles. Let the row sit centered and readable, since this is the "real, measured" anchor.
-2. Move down to the Heating (gas) row and click it once. Hold 1.5 seconds. The key figure "about 82 tonnes, are real" lands as the zoom finishes settling, so the spoken number sits on the rows that are actually measured.
-3. Move to the LOW confidence label and click it once, directly on the LOW text itself, not the adjacent caption space. Hold 1.5 seconds, slightly longer if the zoom is still easing. The key word in "confidence reads low on purpose" hits exactly as the zoom settles on LOW. This is the honesty beat, so let LOW fully own the frame before any further motion.
-4. Move to "Update school data" and click it once. Hold 1.5 seconds so the input view opens and the zoom settles on the now-visible fields. No second click yet. The voiceover bridges with "when the class adds real local numbers."
-5. Enter the three required inputs in one calm pass, treating data entry as a single deliberate action rather than three jittery hops: meals per day, then commute share, then water. Energy is pre-seeded, so do not touch it. Type at a steady pace with no hunting between fields and no on-camera corrections, letting the cursor and zoom glide field to field. All three are required, because the model needs four of six categories on real data to reach MEDIUM, and meals alone will not move the chip.
-6. Move to "Save" and click it once. Immediately go still and do not chase the result with the cursor.
-7. Hold on the overall confidence chip for a full two seconds without moving, clicking, or scrolling, so the zoom holds on the chip while it transitions from LOW to MEDIUM. The payoff "the confidence climbs from low to medium" must land precisely as the chip flips to MEDIUM. If the chip animates, the verb "climbs" should ride the animation rather than precede it. This is the emotional peak, so the settle must be rock-steady for clean playback on mute.
+1. The measured-energy beat (combined). Move in one arc to the Electricity row and click it once, framing it so the Heating (gas) row directly below sits inside the same zoom, so both real rows read at once. Hold 1.5 seconds. The voiceover "the electricity and gas figures, about 82 tonnes, are real" lands as the zoom settles on the two measured rows. This is one beat, not two, so the static chart does not eat the opening minute.
+2. Move to the LOW confidence label and click it once, directly on the LOW text itself, not the adjacent caption space. Hold 1.5 seconds, slightly longer if the zoom is still easing. The key word in "confidence reads low on purpose" hits exactly as the zoom settles on LOW. This is the honesty beat, so let LOW fully own the frame, then move off the chart.
+3. The screen change. Move to "Update school data" and click it once. Hold 1.5 seconds so the input view opens and the zoom settles on the now-visible fields. This is the deliberate early exit from the static chart, roughly twelve seconds into the scene, and every beat after this lives on the new input view, which is what keeps the first minute from sitting on one screen. No second click yet. The voiceover bridges with "when the class adds real local numbers."
+4. Enter the three required inputs in one calm pass, treating data entry as a single deliberate action rather than three jittery hops: meals per day, then commute share, then water. Energy is pre-seeded, so do not touch it. Type at a steady pace with no hunting between fields and no on-camera corrections, letting the cursor and zoom glide field to field. All three are required, because the model needs four of six categories on real data to reach MEDIUM, and meals alone will not move the chip.
+5. Move to "Save" and click it once. Immediately go still and do not chase the result with the cursor.
+6. Hold on the overall confidence chip for a full two seconds without moving, clicking, or scrolling, so the zoom holds on the chip while it transitions from LOW to MEDIUM. The payoff "the confidence climbs from low to medium" must land precisely as the chip flips to MEDIUM. If the chip animates, the verb "climbs" should ride the animation rather than precede it. This is the emotional peak, so the settle must be rock-steady for clean playback on mute.
 
 **Scroll.** At most one scroll, used only before beat 1 and only if the energy rows or the confidence chip are not already in the vertical center. Use a single slow scroll to center the energy rows, then do not scroll again for the rest of the scene. If the input view opens already centered, scroll is none from that point. Never micro-scroll to fix framing mid-beat.
 
 **Caption sync.** Two captions only.
-- `Energy = measured public data` fades in as the zoom settles on the Heating (gas) row in beat 2, on the 82-tonnes word, reinforcing "real and measured" exactly where the eye is. Hold it through the LOW beat, then fade it before the "Update school data" click so the input view is uncluttered.
-- `add real inputs → confidence LOW → MEDIUM` fades in at beat 7, timed to the chip flipping to MEDIUM, as a mute-mode backstop on the same frame the voiceover says "low to medium." The second caption appears only after the first is gone.
+- `Energy = measured public data` fades in as the zoom settles on the combined energy rows in beat 1, on the 82-tonnes word, reinforcing "real and measured" exactly where the eye is. Hold it through the LOW beat, then fade it before the "Update school data" click so the input view is uncluttered.
+- `add real inputs → confidence LOW → MEDIUM` fades in at beat 6, timed to the chip flipping to MEDIUM, as a mute-mode backstop on the same frame the voiceover says "low to medium." The second caption appears only after the first is gone.
 
 **Avoid.**
 - Clicking whitespace near the LOW chip, since the zoom must land on the LOW text itself.
@@ -411,18 +426,18 @@ Captions appear only on settled frames and never overlap a cursor move or a zoom
 
 1. Click the School Footprint Card by clicking the "School Hidden Footprint" heading itself, not the surrounding whitespace, so the target is the card. Hold 1.5 seconds while the zoom settles and the view navigates to the FootprintDashboard. Voiceover context: "This is where the leverage idea becomes a decision rather than a slogan."
 2. After the dashboard paints, take the one allowed scroll to bring section ④ into vertical center, stopping with the top-ranked RecommendationCard centered. Then click that card's recommendation title. Hold 1.5 seconds while the zoom lands on the top action. The key word "ranks" lands as the zoom settles.
-3. Click the "Projected annual CO₂e avoided: N kg" badge, clicking the green badge text itself, since this is the real per-action carbon number standing in for the script's nonexistent `kg/mo` headline. Hold 1.5 seconds. The voiceover "how much carbon each one avoids" lands here.
-4. Click the "Estimated impact:" badge. Hold 1 second while the zoom recenters on the impact figure. The voiceover "the cost band, the effort" plays over it. [These exact words have no matching element, so this beat covers them with the closest real evidence chip. Do not search for a cost or effort line.]
-5. Click the "Why:" reasoning box, on the "Why:" label inside the gray panel. Hold 1.5 seconds while the zoom settles on the AI's stated rationale. The voiceover "the exact metric the class would check to confirm it worked" and "the AI retrieves evidence and drafts language" ride this beat, since the "Why:" box is the on-screen proof that the wording is AI-drafted evidence.
-6. Click the "Proposed — awaiting approval" status chip at the card top. Hold 1 second while the zoom lands on the word "Proposed." The voiceover "Each action stays a proposal until a named staff member signs off" begins here.
-7. Click the "✓ Approve — Make Active Goal" button. Hold 1.5 seconds dead still while the approve action resolves and the card flips state. The chip changes to "✓ Approved — active school goal" and the button region becomes the "Active — visible on school leaderboard feed" status bar. The voiceover "a named staff member signs off" and "Once a fix is approved" lands exactly as the green Approved state settles. This is the emotional center, so do not rush the hold; let the green state fully settle.
-8. Click the now-green "✓ Approved — active school goal" chip (or the "Active — visible on school leaderboard feed" bar) on the just-approved card. Hold 1.5 seconds while the zoom rests on the approved state. [This substitutes for the script's nonexistent `record measured before/after` row. Since no measurement row renders, end the verification beat on the strongest real "it is now a real, human-owned goal" element rather than fabricating a click.] The voiceover tail "so students see measured outcomes, not just predictions" plays over this settled green state, then trails into the close.
+3. Click the "Projected annual CO₂e avoided: N kg" badge, clicking the green badge text itself, since this is the real per-action carbon number. Hold 1.5 seconds. The voiceover "shows projected annual CO₂e avoided" lands here.
+4. Click the "Estimated impact:" badge. Hold 1 second while the zoom recenters on the impact figure. The voiceover "gives an estimated-impact badge" plays over it and now names the exact element on screen.
+5. Click the "Why:" reasoning box, on the "Why:" label inside the gray panel. Hold 1.5 seconds while the zoom settles on the AI's stated rationale. The voiceover "explains the reasoning in a Why box" and "The AI can draft the case, but it cannot approve the goal" ride this beat, since the "Why:" box is the on-screen proof that the wording is AI-drafted evidence.
+6. Click the "Proposed — awaiting approval" status chip at the card top. Hold 1 second while the zoom lands on the word "Proposed." The voiceover "The card stays Proposed until staff click Approve" begins here.
+7. Click the "✓ Approve — Make Active Goal" button. Hold 1.5 seconds dead still while the approve action resolves and the card flips state. The chip changes to "✓ Approved — active school goal" and the button region becomes the "Active — visible on school leaderboard feed" status bar. The voiceover "staff click Approve. Then it becomes an active school goal, visible on the leaderboard feed" lands exactly as the green Approved state settles. This is the emotional center, so do not rush the hold; let the green state fully settle.
+8. Click the now-green "✓ Approved — active school goal" chip (or the "Active — visible on school leaderboard feed" bar) on the just-approved card. Hold 1.5 seconds while the zoom rests on the approved state. [No before/after measurement row renders, so end the governance beat on the strongest real "it is now a real, human-owned goal" element rather than fabricating a click.] The voiceover tail "the class can track what actually changes" plays over this settled green state, then trails into the close.
 
 **Scroll.** Exactly one scroll, used only at beat 2 to bring section ④ and the top RecommendationCard into vertical center after the dashboard loads. Do not scroll to reveal sections ②, ③, or ⑤, and do not micro-scroll to reframe the card after approval, since beat 7's state change happens in place.
 
 **Caption sync.** Two captions only, matching the script's two on-screen text strings.
-- `ranked by CO₂e/mo · cost · effort · verify-by · owner` fades in as the beat 2 to 3 zoom settles on the top card's projected-CO₂e badge, under the voiceover word "ranks." [This caption advertises `cost`, `verify-by`, and `owner` fields that are not rendered as labeled rows. Keep it brief and let it sit over the ranked card generally; do not imply the viewer should look for those exact labels on screen.]
-- `human-approved · measured` fades in the instant the Approve click in beat 7 flips the card to green, under the voiceover "approved." Hold it through beat 8. Clear both captions before the clean exit.
+- `projected CO₂e avoided · estimated impact · why` fades in as the beat 2 to 3 zoom settles on the top card's projected-CO₂e badge, under the voiceover word "ranks." Every field it names is a real on-screen element, so it can sit directly over them.
+- `proposed → staff-approved active goal` fades in the instant the Approve click in beat 7 flips the card to green, under the voiceover "Approve." Hold it through beat 8. Clear both captions before the clean exit.
 
 **Avoid.**
 - Hunting for `~X kg/mo`, `cost band · effort`, `Verify by:`, a `proposed → approved → verified` triple, or a `before/after` row. They do not exist, and cursor-hunting spikes velocity and is an automatic retake.
@@ -520,7 +535,7 @@ Across beats 6 to 9 the sequence is strictly action, then settle, then word, so 
 
 **Goal.** Make the viewer feel the student loop close honestly and completely: a photo becomes a verified action, the kilograms come from a cited factor rather than the AI, the points are scored server-side, and that single action then surfaces publicly in the Feed, pings the student via the bell, and feeds the quest ranking driven by the school's biggest emitter. The clip must read as "the AI describes, but never awards itself a point," and as one continuous journey from logged action to public recognition.
 
-**Pre-roll state.** Start on the Quests screen (dedicated Quests tab), or the Home screen with the Quests section in view, whichever take begins cleanest. The first action is clicking "Log action," so the "Log action" card (camera icon, green, in the Quick Actions Grid) must be visible and centered before the clip starts. Do not start mid-scroll. The bike or LED photo is already picked into the file dialog before this take begins, so clicking the upload control advances straight into the analyzing and result phases without an OS file-picker appearing on camera. The notifications bell on the Home header already carries seeded history with an unread coral badge, so the bell reads as real content the instant it opens. The Feed already shows topical action photos on each post, not empty banners, so the freshly created post intercuts against a populated feed. The device is framed in the canonical 1080×1920 portrait shell, centered, with no full-bleed.
+**Pre-roll state.** Start on the Quests screen (dedicated Quests tab), or the Home screen with the Quests section in view, whichever take begins cleanest. The first action is clicking "Log action," so the "Log action" card (camera icon, green, in the Quick Actions Grid) must be visible and centered before the clip starts. Do not start mid-scroll. The photo upload is handled as an edited insert: use a seeded demo image path or a drag-drop test fixture, or cut from the upload click straight to the analyzing phase, so no OS file-picker appears on camera. If the OS picker shows in the raw take, that take is unusable. The notifications bell on the Home header already carries seeded history with an unread coral badge, so the bell reads as real content the instant it opens. The Feed already shows topical action photos on each post, not empty banners, so the freshly created post intercuts against a populated feed. The device is framed in the canonical 1080×1920 portrait shell, centered, with no full-bleed.
 
 **Cursor and click choreography.**
 
