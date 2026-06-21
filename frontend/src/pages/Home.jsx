@@ -75,7 +75,7 @@ export default function Home({ ctx }) {
             <Icon name="sparkle" size={22} color="#fff" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--green)' }}>Direction B · AI Insights</div>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.07em', textTransform: 'uppercase', color: 'var(--green)' }}>AI Insights</div>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, marginTop: 1 }}>School Hidden Footprint</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginTop: 1 }}>Anomalies · Predictions · Recommendations</div>
           </div>
