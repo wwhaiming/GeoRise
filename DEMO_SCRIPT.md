@@ -79,8 +79,13 @@ COACH_ENABLED=true npm run demo
 - The footprint baseline is pre-seeded with real Seattle energy.
 - **Confirm the Research tab is full:** Browse should list real papers and refresh on each click;
   Ask should return a cited answer. (If empty, re-run `npm run seed:research`.)
-- Open **Learning -> AI Insights** and confirm the ranked action plan shows, per action, a kg/mo
-  impact, a cost band + effort line, and a "Verify by" metric, with an Approve control.
+- From the Home screen, open the **School Hidden Footprint** card, which now leads straight into the
+  AI Insights action plan, and confirm that every action shows its monthly kilogram impact, a cost
+  band with an effort line, and a "Verify by" metric, alongside an Approve control.
+- On the Home header, open the **notifications bell** and confirm that the seeded history is present,
+  with a small unread badge, so the bell already shows real content the moment a judge logs in.
+- On the **Feed** tab, confirm that each post now carries a topical action photo rather than an empty
+  banner, since the feed is part of what the closing scene shows.
 - Pick your bike or LED photo into the file dialog *before* the Scene 7 take.
 
 ---
@@ -126,8 +131,9 @@ COACH_ENABLED=true npm run demo
 - **ON-SCREEN TEXT:** `Leverage: one student action  vs  the school's biggest line`
 
 ### Scene 4 · 1:45 – 2:35 · From insight to decision (the decision engine + governance)
-- **SCREEN:** Go to the **Learning** tab and open the **AI Insights** action plan. On the top ranked
-  action, click `~X kg/mo`, pause. Click its **cost band · effort** line, pause. Click **Verify by:
+- **SCREEN:** From the Home screen, open the **School Hidden Footprint** card, which now leads directly
+  into the **AI Insights** action plan, so the deepest analysis in the product sits one tap from the
+  landing screen. On the top ranked action, click `~X kg/mo`, pause. Click its **cost band · effort** line, pause. Click **Verify by:
   <metric>**, pause. Click the **status chips** (proposed → approved → verified), pause. Click
   **Approve** on one action, then on the now-approved action click into the **record measured
   before/after** row so the verification step is visible.
@@ -173,12 +179,18 @@ COACH_ENABLED=true npm run demo
 ### Scene 7 · 4:00 – 4:35 · The student side closes the loop
 - **SCREEN:** Click **Log action**, pause. Click the upload control (photo pre-selected). After it
   submits, click-zoom two things only: the **AI-detected** label with the carbon math, and the
-  **points awarded**. Then click **Quests** and click the top quest tied to the biggest emitter.
+  **points awarded**. Open the **Feed** tab and hold for two seconds on the post that this action just
+  created, which now appears with a real action photo so the community side of the loop is visible.
+  Open the **notifications bell** on the Home header and hold on the points entry that the same action
+  generated. Then click **Quests** and click the top quest tied to the biggest emitter.
 - **VO:** *"Students still take action, and it has to be just as honest as everything else. When
   someone logs an action, a vision model identifies the photo, but the kilograms come from the same
   cited factor, and the points are scored on the server. The AI can describe an action, but it can
-  never award itself a single point. And the quests the class sees are ranked by the school's biggest
-  emitter, so the footprint decides what students are asked to do, rather than the other way around."*
+  never award itself a single point. Once the action is verified, it surfaces in the class feed with its
+  own photo, and the student receives a notification for the points that were awarded, so the journey
+  from a logged action to public recognition stays visible to everyone in the class. And the quests the
+  class sees are ranked by the school's biggest emitter, so the footprint decides what students are
+  asked to do, rather than the other way around."*
 - **ON-SCREEN TEXT:** `vision detects · math is deterministic · points scored server-side`
 
 ### Scene 8 · 4:35 – 5:00 · Impact, scale, and the close
