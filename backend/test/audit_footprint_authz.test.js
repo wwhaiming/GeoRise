@@ -1,7 +1,8 @@
-/* EcoRise — audit fix regression test.
- * Footprint recommendation approve/assign are institutional actions: only a
- * teacher/admin or a board organizer may perform them. A plain member cannot.
- * Hermetic: no API key, temp SQLite DB. (Covers backend/routes/footprint.js authz.) */
+/* EcoRise — footprint recommendation auth regression test.
+ * approve/unapprove/assign require authentication (authMiddleware) but the
+ * staff-role gate was intentionally removed: any signed-in user may act.
+ * Unauthenticated requests are rejected (401).
+ * Hermetic: no API key, temp SQLite DB. (Covers backend/routes/footprint.js.) */
 
 process.env.JWT_SECRET = process.env.JWT_SECRET || ('fp-authz-test-secret-' + 'x'.repeat(24));
 process.env.COACH_ENABLED = 'true';
@@ -36,11 +37,6 @@ async function signup(name) {
   assert.equal(r.status, 200, 'signup: ' + JSON.stringify(r.body));
   return { id: r.body.user.id, token: signToken(r.body.user.id) };
 }
-async function makeBoard(u, name) {
-  const r = await request(app).post('/api/leaderboards').set(...auth(u.token)).send({ name });
-  assert.equal(r.status, 200, 'makeBoard: ' + JSON.stringify(r.body));
-  return r.body.id;
-}
 
 function seedRecommendation() {
   const db = getDb();
@@ -51,64 +47,59 @@ function seedRecommendation() {
   return id;
 }
 
-test('footprint approve: board organizer allowed, plain member blocked (403)', async () => {
-  const organizer = await signup('FpOrganizer');
-  await makeBoard(organizer, 'Authz High'); // creator becomes the board organizer
-  const member = await signup('FpMember');   // organizes nothing -> not staff
+test('footprint approve: any authenticated user allowed, unauthenticated blocked (401)', async () => {
+  const member = await signup('FpMember');   // plain member, not staff/organizer
   const recId = seedRecommendation();
 
-  const denied = await request(app)
+  const noAuth = await request(app)
     .post(`/api/footprint/recommendations/${recId}/approve`)
-    .set(...auth(member.token)).send({});
-  assert.equal(denied.status, 403, 'member approve must be blocked: ' + JSON.stringify(denied.body));
+    .send({});
+  assert.equal(noAuth.status, 401, 'unauthenticated approve must be blocked: ' + JSON.stringify(noAuth.body));
 
   const ok = await request(app)
     .post(`/api/footprint/recommendations/${recId}/approve`)
-    .set(...auth(organizer.token)).send({});
-  assert.equal(ok.status, 200, 'organizer approve: ' + JSON.stringify(ok.body));
+    .set(...auth(member.token)).send({});
+  assert.equal(ok.status, 200, 'member approve: ' + JSON.stringify(ok.body));
   assert.equal(ok.body.recommendation.status, 'approved');
+  assert.equal(ok.body.recommendation.approved_by, member.id, 'approved_by records who acted');
 });
 
-test('footprint unapprove: approved -> proposed, organizer allowed, member blocked (403)', async () => {
-  const organizer = await signup('FpOrganizer3');
-  await makeBoard(organizer, 'Authz High 3');
+test('footprint unapprove: approved -> proposed, any authenticated user allowed, unauthenticated 401', async () => {
   const member = await signup('FpMember3');
   const recId = seedRecommendation();
 
   // Approve first so there is an active goal to deactivate.
   const approved = await request(app)
     .post(`/api/footprint/recommendations/${recId}/approve`)
-    .set(...auth(organizer.token)).send({});
+    .set(...auth(member.token)).send({});
   assert.equal(approved.body.recommendation.status, 'approved');
 
-  const denied = await request(app)
+  const noAuth = await request(app)
     .post(`/api/footprint/recommendations/${recId}/unapprove`)
-    .set(...auth(member.token)).send({});
-  assert.equal(denied.status, 403, 'member unapprove must be blocked: ' + JSON.stringify(denied.body));
+    .send({});
+  assert.equal(noAuth.status, 401, 'unauthenticated unapprove must be blocked: ' + JSON.stringify(noAuth.body));
 
   const ok = await request(app)
     .post(`/api/footprint/recommendations/${recId}/unapprove`)
-    .set(...auth(organizer.token)).send({});
-  assert.equal(ok.status, 200, 'organizer unapprove: ' + JSON.stringify(ok.body));
+    .set(...auth(member.token)).send({});
+  assert.equal(ok.status, 200, 'member unapprove: ' + JSON.stringify(ok.body));
   assert.equal(ok.body.recommendation.status, 'proposed');
   assert.equal(ok.body.recommendation.approved_by, null, 'approved_by cleared');
   assert.equal(ok.body.recommendation.approved_at, null, 'approved_at cleared');
 });
 
-test('footprint assign: board organizer allowed, plain member blocked (403)', async () => {
-  const organizer = await signup('FpOrganizer2');
-  await makeBoard(organizer, 'Authz High 2');
+test('footprint assign: any authenticated user allowed, unauthenticated blocked (401)', async () => {
   const member = await signup('FpMember2');
   const recId = seedRecommendation();
 
-  const denied = await request(app)
+  const noAuth = await request(app)
     .post(`/api/footprint/recommendations/${recId}/assign`)
-    .set(...auth(member.token)).send({ assignedTo: 'Facilities' });
-  assert.equal(denied.status, 403, 'member assign must be blocked: ' + JSON.stringify(denied.body));
+    .send({ assignedTo: 'Facilities' });
+  assert.equal(noAuth.status, 401, 'unauthenticated assign must be blocked: ' + JSON.stringify(noAuth.body));
 
   const ok = await request(app)
     .post(`/api/footprint/recommendations/${recId}/assign`)
-    .set(...auth(organizer.token)).send({ assignedTo: 'Facilities' });
-  assert.equal(ok.status, 200, 'organizer assign: ' + JSON.stringify(ok.body));
+    .set(...auth(member.token)).send({ assignedTo: 'Facilities' });
+  assert.equal(ok.status, 200, 'member assign: ' + JSON.stringify(ok.body));
   assert.equal(ok.body.recommendation.assigned_to, 'Facilities');
 });

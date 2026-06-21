@@ -103,23 +103,12 @@ router.get('/insights', authMiddleware, async (req, res) => {
   }
 });
 
-// A recommendation is an institutional action, so only school staff may act on it:
-// a teacher/admin (users.role) or a board organizer (the staff member who runs the
-// school's board). A plain member/student cannot approve or assign.
-function canManageRecommendations(db, userId) {
-  const role = db.prepare('SELECT role FROM users WHERE id = ?').get(userId)?.role;
-  if (role === 'teacher' || role === 'admin') return true;
-  return !!db.prepare('SELECT 1 FROM leaderboards WHERE organizer_id = ?').get(userId);
-}
-
 // ── POST /api/footprint/recommendations/:id/approve ──
-// Two-step gate: proposed → approved. Restricted to a teacher/admin or a board
-// organizer (see canManageRecommendations); a student/member cannot self-approve.
+// proposed → approved. Any authenticated user may approve — the staff-role gate
+// (teacher/admin/organizer) was intentionally removed per product decision.
+// Auth is still required (authMiddleware); approved_by records who acted.
 router.post('/recommendations/:id/approve', authMiddleware, (req, res) => {
   const db = getDb();
-  if (!canManageRecommendations(db, req.userId)) {
-    return res.status(403).json({ error: 'Only a teacher/admin or board organizer can approve recommendations.' });
-  }
   const rec = db.prepare('SELECT * FROM fp_recommendations WHERE id = ?').get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   if (rec.status === 'approved') return res.json({ ok: true, alreadyApproved: true, recommendation: rec });
@@ -134,13 +123,10 @@ router.post('/recommendations/:id/approve', authMiddleware, (req, res) => {
 
 // ── POST /api/footprint/recommendations/:id/unapprove ──
 // Reverse of approve: approved → proposed. Pulls the goal off the active
-// school leaderboard feed and clears the approval audit fields. Same gate as
-// approve — deactivating an institutional goal is as privileged as activating it.
+// school leaderboard feed and clears the approval audit fields. Any
+// authenticated user may deactivate (staff-role gate intentionally removed).
 router.post('/recommendations/:id/unapprove', authMiddleware, (req, res) => {
   const db = getDb();
-  if (!canManageRecommendations(db, req.userId)) {
-    return res.status(403).json({ error: 'Only a teacher/admin or board organizer can deactivate recommendations.' });
-  }
   const rec = db.prepare('SELECT * FROM fp_recommendations WHERE id = ?').get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
   if (rec.status !== 'approved') return res.json({ ok: true, alreadyProposed: true, recommendation: rec });
@@ -161,9 +147,6 @@ router.post('/recommendations/:id/assign', authMiddleware, (req, res) => {
     return res.status(400).json({ error: 'assignedTo is required' });
   }
   const db = getDb();
-  if (!canManageRecommendations(db, req.userId)) {
-    return res.status(403).json({ error: 'Only a teacher/admin or board organizer can assign recommendations.' });
-  }
   const rec = db.prepare('SELECT id FROM fp_recommendations WHERE id = ?').get(req.params.id);
   if (!rec) return res.status(404).json({ error: 'Recommendation not found' });
 
