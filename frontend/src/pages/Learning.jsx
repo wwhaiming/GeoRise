@@ -3,10 +3,9 @@ import { useState } from 'react';
 import Icon from '../components/Icon';
 import Coach from './Coach';
 import Research from './Research';
-import Insights from '../components/Insights';
 
 export default function Learning({ ctx }) {
-  const [subTab, setSubTab] = useState('coach'); // 'coach' | 'research' | 'insights'
+  const [subTab, setSubTab] = useState('coach'); // 'coach' | 'research'
 
   return (
     <div className="screen-in">
@@ -23,7 +22,7 @@ export default function Learning({ ctx }) {
       {/* Sub-tab Toggle Pill */}
       <div style={{ padding: '10px 16px' }}>
         <div style={{ display: 'flex', gap: 6, background: 'var(--navy-800)', padding: 5, borderRadius: 9999 }}>
-          {[['coach', 'AI Coach'], ['research', 'Research Library'], ['insights', 'AI Insights']].map(([k, l]) => (
+          {[['coach', 'AI Coach'], ['research', 'Research Library']].map(([k, l]) => (
             <button key={k} onClick={() => setSubTab(k)} className="btn btn-sm" style={{
               flex: 1, fontFamily: 'var(--display)', fontWeight: 600, fontSize: 14,
               background: subTab === k ? 'linear-gradient(180deg,var(--navy-800),var(--navy-700))' : 'transparent',
@@ -36,10 +35,8 @@ export default function Learning({ ctx }) {
       {/* Conditional Content Rendering */}
       {subTab === 'coach' ? (
         <Coach ctx={ctx} isCombined={true} />
-      ) : subTab === 'research' ? (
-        <Research ctx={ctx} isCombined={true} />
       ) : (
-        <Insights leaderboardId={ctx.leaderboardId} showToast={ctx.showToast} />
+        <Research ctx={ctx} isCombined={true} />
       )}
     </div>
   );
