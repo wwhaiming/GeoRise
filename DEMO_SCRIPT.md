@@ -10,6 +10,26 @@ makes the leverage ratio visible.
 
 ---
 
+## Navigation map (read this first)
+
+The app has **no top-level "Footprint" tab.** There are two distinct footprint surfaces — don't
+confuse them:
+
+| Surface | How to reach it | What it is |
+|---|---|---|
+| **School footprint card** | Bottom nav **Learning** → **AI Coach** sub-tab → card sits at the top, above the coach quiz | The `Xt CO₂e / mo` headline, category bars (flame = biggest emitter), **Action leverage**, **Next step** recommendation, **Update school data** / **Save baseline**. This is the Hook + Solution screen. |
+| **Weekly Insights dashboard** | Bottom nav **Home** → tap the **"School Hidden Footprint"** card (green, "Direction B · AI Insights") | The full pipeline: ① Input data → ② Anomaly Detection → ③ Cafeteria Forecast → ④ Recommendations + **Human Approval Gate** → ⑤ Generative summary. This is the approval-gate screen. |
+
+**Bottom nav (4 tabs + center FAB):** `Home` · `Learning` · `Feed` · `Profile`. The green **+**
+FAB in the center = **Log action**.
+
+**Learning sub-tabs (pill toggle at top):** `AI Coach` · `Research Library` · `AI Insights`.
+- *AI Coach* — School footprint card + coach quiz.
+- *Research Library* — the responsible-AI **eval report card** (faithfulness, refusal, hallucination, injection resistance, Recall@k, MRR).
+- *AI Insights* — anomaly/forecast insights widget.
+
+---
+
 ## Setup (once, ~30s before judging)
 
 ```bash
@@ -19,7 +39,8 @@ cd backend && COACH_ENABLED=true npm run seed:coach   # enable + seed the coach 
 ```
 
 Open http://localhost:5173 and log in as `demo@ecorise.app` (password printed by seed).
-Board: **Garfield High School**. Navigate to **School Footprint** and leave it open.
+Board: **Garfield High School**. In the bottom nav tap **Learning**, make sure the **AI Coach**
+sub-tab is selected, and leave it on the **School footprint card** (top of that tab).
 
 With `OPENAI_API_KEY` set you get live AI; without it the app uses the deterministic mock
 and labels itself "DEMO — no model." Either path is valid; call it out if asked.
@@ -41,7 +62,8 @@ and labels itself "DEMO — no model." Either path is valid; call it out if aske
 
 ## Hook · 0:00 – 0:30 · The problem
 
-**What's on screen:** School Footprint card. Nothing else.
+**Where:** Bottom nav **Learning** → **AI Coach** sub-tab. Top of the screen = the **School
+footprint card** (`eyebrow: "School footprint"`, big `Xt CO₂e / mo` number). Don't scroll past it.
 
 > *"Most eco apps track student behavior. They count the bike rides and the recycled bottles.
 > But Garfield High School emits 47 tonnes of CO₂ every month from its energy bill alone — and
@@ -49,15 +71,17 @@ and labels itself "DEMO — no model." Either path is valid; call it out if aske
 > students. It was the school."*
 
 **Beats:**
-1. Let the `Xt CO₂e / mo` headline sit for 3 seconds. Don't click anything.
-2. Sweep down the category bars. Point at the flame icon on the top bar: *"That's the biggest emitter."*
+1. Let the `Xt CO₂e / mo` headline (top-left of the card) sit for 3 seconds. Don't click anything.
+2. Sweep down the category bars below it. Point at the 🔥 **flame icon** on the top (coral) bar:
+   *"That's the biggest emitter."* The flame only ever marks the #1 category.
 
 ---
 
 ## Solution · 0:30 – 2:00 · The AI approach
 
-**What to show:** Stay on School Footprint. Click **Update school data**, enter real numbers, save.
-Then scroll to **Action leverage** and **Next step**.
+**Where:** Stay on the **School footprint card** (Learning → AI Coach). Click the **Update school
+data** button (bottom of the card) to open the baseline wizard, enter real numbers, **Save baseline**.
+Then read the **Action leverage** block and the **Next step** card just below it.
 
 ### 0:30 – 1:00 · The data → confident footprint
 
@@ -65,7 +89,7 @@ Then scroll to **Action leverage** and **Next step**.
 > Fill in what you know — the model fills the rest from national EPA averages. Watch the
 > confidence jump from low to high."*
 
-**Enter these demo values:**
+**Enter these demo values** (wizard field labels are exact — leave the rest on `est.`):
 | Field | Value |
 |---|---|
 | Electricity (kWh/mo) | `42000` |
@@ -73,7 +97,8 @@ Then scroll to **Action leverage** and **Next step**.
 | Bus miles/week | `620` |
 | Meals served/day | `1400` |
 
-Click **Save baseline** → toast fires → card reloads with `high` confidence chip.
+Click **Save baseline** → toast **"Footprint baseline updated"** fires → card reloads and the
+small **confidence chip** (top-right, next to the ⓘ) climbs toward `high confidence`.
 
 ### 1:00 – 1:30 · The leverage ratio
 
@@ -82,18 +107,25 @@ Click **Save baseline** → toast fires → card reloads with `high` confidence 
 > it's a rounding error until someone fixes the HVAC schedule. That's what the leverage
 > panel shows."*
 
-Point at `leverage.message`. Read the kg-vs-tonnes ratio aloud.
+Point at the green **Action leverage** block on the card. Read its kg-vs-tonnes ratio aloud.
 
 ### 1:30 – 2:00 · The AI recommendation + faithfulness gate
 
-Scroll to the **Next step** card (sparkle icon, dark background).
+On the same card, drop to the **Next step** block (sparkle icon, dark navy background, directly
+below Action leverage).
 
 > *"The AI generated a recommendation. But it only appeared here because it scored 0.82 on
 > our faithfulness gate — a check against the source corpus. Below the recommendation: the
 > grounding score and the actual citation. The LLM did not invent a number. A deterministic
 > engine computed it from an EPA factor."*
 
-Point: recommendation headline → explanation → source chip → `?` help tip (grounding score).
+Point in order: recommendation headline → explanation → green leaf **source chip(s)** (click one,
+it opens the cited paper) → the **ⓘ help tip** at the top-right of the block (hover = the grounding
+score, e.g. "Grounding score: 0.82 (passes faithfulness gate)").
+
+> **Dev note:** without `COACH_ENABLED=true` + a seeded corpus, this block renders the labeled
+> **"Demo fixture"** version (dashed coral border, LED-retrofit example, score 0.82). Say so if asked —
+> the live path is identical minus the badge.
 
 > **AI layer note for judges:** `COACH_ENABLED=true` activates RAG retrieval over a
 > 1,000-paper corpus using sqlite-vec embeddings, then scores every candidate answer against
@@ -106,7 +138,8 @@ Point: recommendation headline → explanation → source chip → `?` help tip 
 
 ### 2:00 – 2:30 · Log an action → Evidence Panel
 
-- Tap **Log action**, add a photo (bike or LED swap).
+- Tap the green **+ FAB** in the center of the bottom nav (opens **Log action**). Add a photo
+  (bike or LED swap). The Evidence Panel opens automatically on submit.
 - Walk the Evidence Panel: **AI detected** + confidence ring → **Carbon math** (formula +
   cited factor + range) → **Points awarded** → **AI pipeline · tools run** → **Integrity checks**.
 
@@ -115,29 +148,37 @@ Point: recommendation headline → explanation → source chip → `?` help tip 
 
 ### 2:30 – 3:00 · Human-in-the-loop approval gate
 
-Return to School Footprint insights dashboard.
+**Where:** Bottom nav **Home** → tap the green **"School Hidden Footprint"** card (eyebrow
+"Direction B · AI Insights"). This opens the **Weekly Insights dashboard**. Scroll to **④ AI
+Recommendations + Human Approval Gate** — each card shows a **✓ Approve — Make Active Goal** button
+and the status chip `0/N recs approved` at the top.
 
 > *"Every recommendation requires a named staff member to approve it before it becomes
 > active. That is a hard constraint, not a UX choice — because wrong cafeteria orders
 > affect 1,400 lunches."*
 
-Show **Flag as Inaccurate** on a prediction card.
+Then point at the **Flag as inaccurate** control on a prediction (③) or recommendation (④) card.
 
 > *"Staff can flag predictions wrong. Repeated flags surface as a model-review signal.
 > They don't just consume outputs — they correct the model."*
 
 ### 3:00 – 3:30 · AI report card (Research tab)
 
-Open **Research** tab → scroll to eval metrics.
+**Where:** Bottom nav **Learning** → switch the pill toggle to the **Research Library** sub-tab →
+scroll to the responsible-AI **eval report card**.
 
 > *"These are live numbers from our eval harness — re-run with `npm run test:coach-eval`.
-> Not hardcoded. Faithfulness pass rate, citation validity, hallucination rate,
-> injection resistance, Recall@k. The refusal card: if a question can't be grounded,
-> the coach withholds rather than guesses."*
+> Not hardcoded. Faithfulness pass, unanswerable-refusal rate, refusal precision,
+> hallucination rate, injection resistance, retrieval Recall@k and MRR. The refusal row:
+> if a question can't be grounded, the coach withholds rather than guesses."*
+
+> **Dev note:** without the live harness, this card shows a clearly labeled **"Demo fixture"**
+> with the same layout. Point at the label if asked.
 
 ### 3:30 – 4:00 · Quests driven by footprint analysis
 
-Navigate to **Quests**.
+**Where:** Bottom nav **Home** → scroll past the board and the "School Hidden Footprint" card to
+the **Quests** section (below the dashed divider).
 
 > *"Quest categories are ranked by the school's top emitter. When energy is the biggest
 > source, energy quests surface first. The footprint analysis drives what students are
@@ -147,7 +188,7 @@ Navigate to **Quests**.
 
 ## Impact · 4:00 – 4:30 · Who benefits
 
-**Stay on Quests or return to Footprint card.**
+**Stay on Home (Quests section) or return to the School footprint card (Learning → AI Coach).**
 
 > *"Three groups benefit directly. Teachers get an auditable, cited baseline they can
 > hand to a facilities manager — not an AI guess. Students get quests ranked by actual
