@@ -449,7 +449,6 @@ export default function FootprintDashboard({ ctx }) {
             <Icon name="home" size={18} color="var(--text-muted)" />
           </button>
           <div style={{ flex: 1 }}>
-            <div className="eyebrow" style={{ color: 'var(--green)' }}>Direction B · My School's Hidden Footprint</div>
             <div style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: 20, lineHeight: 1.15 }}>
               {data?.school?.name ?? 'Greenfield High'} — Weekly Insights
             </div>
