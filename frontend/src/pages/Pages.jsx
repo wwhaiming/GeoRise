@@ -1,5 +1,6 @@
 /* EcoRise — Feed, Quests, Profile, Leaderboard, Organizer pages */
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Icon from '../components/Icon';
 import Avatar from '../components/Avatar';
 import Podium from '../components/Podium';
@@ -343,8 +344,54 @@ export function Leaderboard({ ctx, isCombined }) {
 /* ============================================================
    PROFILE
    ============================================================ */
+function BugReportSheet({ user, onClose }) {
+  const [desc, setDesc] = useState('');
+
+  const submit = () => {
+    const subject = encodeURIComponent('EcoRise Bug Report');
+    const body = encodeURIComponent(
+      `Bug description:\n${desc}\n\n---\nUser: ${user?.name || 'unknown'} (${user?.handle || ''})\nApp: EcoRise`
+    );
+    window.open(`mailto:gapfhog@gmail.com?subject=${subject}&body=${body}`, '_blank');
+    onClose();
+  };
+
+  return createPortal(
+    <>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, zIndex: 9990, background: 'rgba(12,17,14,.5)', backdropFilter: 'blur(2px)' }} />
+      <div role="dialog" aria-modal="true" aria-label="Report a bug" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 9991, background: 'var(--navy-900)', borderRadius: '22px 22px 0 0', padding: '20px 20px calc(24px + env(safe-area-inset-bottom))', boxShadow: '0 -12px 40px rgba(30,91,57,.18)', display: 'grid', gap: 14 }}>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: 'rgba(45,91,57,.18)', margin: '0 auto' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(193,99,66,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="flag" size={20} color="var(--coral)" />
+          </span>
+          <div>
+            <div className="h2" style={{ fontSize: 17, marginBottom: 1 }}>Report a bug</div>
+            <div className="dim" style={{ fontSize: 12.5, fontWeight: 600 }}>Sent to the EcoRise team</div>
+          </div>
+        </div>
+        <textarea
+          className="field"
+          rows={4}
+          placeholder="Describe what happened and how to reproduce it…"
+          value={desc}
+          onChange={e => setDesc(e.target.value)}
+          style={{ resize: 'none', fontSize: 14 }}
+          aria-label="Bug description"
+        />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <button className="btn btn-secondary btn-block" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary btn-block" onClick={submit} disabled={!desc.trim()}>Send report</button>
+        </div>
+      </div>
+    </>,
+    document.querySelector('.app') || document.body
+  );
+}
+
 export function Profile({ ctx }) {
   const { user, members } = ctx;
+  const [bugOpen, setBugOpen] = useState(false);
   const you = members.find(m => m.isYou) || { points: 0, rank: 0, streak: 0 };
   const stats = [
     { label: 'Points', value: (you.points || 0).toLocaleString(), color: 'var(--green)' },
@@ -403,8 +450,10 @@ export function Profile({ ctx }) {
         <button className="btn btn-primary btn-block" onClick={() => ctx.go('home')}><Icon name="trophy" size={18} color="#fff" /> View leaderboard</button>
         <button className="btn btn-purple btn-block" onClick={() => ctx.go('organizer')}><Icon name="plus" size={18} color="#fff" strokeWidth={3} /> Create a leaderboard</button>
         <button className="btn btn-secondary btn-block" onClick={() => ctx.go('privacy')}><Icon name="check" size={18} /> Privacy &amp; data</button>
+        <button className="btn btn-secondary btn-block" onClick={() => setBugOpen(true)}><Icon name="flag" size={18} color="var(--coral)" /> Report a bug</button>
         <button className="btn btn-secondary btn-block" onClick={ctx.logout}>Log out</button>
       </div>
+      {bugOpen && <BugReportSheet user={user} onClose={() => setBugOpen(false)} />}
     </div>
   );
 }

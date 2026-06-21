@@ -340,6 +340,7 @@ export default function App() {
   // ── Context for child components ──
   const ctx = {
     user: user || { name: 'Eco Champion', handle: '@you', avatar: '' },
+    isDemo: user?.email === 'demo@ecorise.app',
     members, posts, quests, leaderboard, leaderboardId,
     resetTarget, bump, podiumVariant,
     go, setScreen, showToast, openLog: () => setModal('log'), openTrash: () => setModal('trash'),

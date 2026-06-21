@@ -6,9 +6,33 @@ import Research from './Research';
 
 export default function Learning({ ctx }) {
   const [subTab, setSubTab] = useState('coach'); // 'coach' | 'research'
+  const [demoBannerDismissed, setDemoBannerDismissed] = useState(
+    () => localStorage.getItem('demo_intro_dismissed') === '1'
+  );
 
   return (
     <div className="screen-in">
+      {/* Demo intro banner */}
+      {ctx.isDemo && !demoBannerDismissed && (
+        <div style={{ margin: '10px 16px 2px', padding: '12px 14px', background: 'rgba(46,125,79,.10)', border: '1px solid rgba(46,125,79,.22)', borderRadius: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--green-d)', marginBottom: 6 }}>
+            Welcome to the EcoRise demo!
+          </div>
+          <div className="muted" style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.45, marginBottom: 10 }}>
+            You&rsquo;re exploring as a guest &mdash; posting is view-only here. Log out and create a free account to log actions, earn points, and invite your friends to compete.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" style={{ flex: 1, fontSize: 12.5, fontWeight: 700 }} onClick={ctx.logout}>
+              Log out &amp; sign up
+            </button>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 12.5 }}
+              onClick={() => { setDemoBannerDismissed(true); localStorage.setItem('demo_intro_dismissed', '1'); }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Unified header */}
       <div style={{ padding: '8px 18px 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{ width: 42, height: 42, borderRadius: 13, background: 'rgba(46,125,79,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
